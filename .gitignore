@@ -5,9 +5,18 @@ data/processed/*
 data/external/*
 !data/**/.gitkeep
 
+# Dataset necesario para la aplicación desplegada
+!data/processed/dataset_modelado.csv
+
+
 # --- Modelos serializados ---
+
 models/*
 !models/.gitkeep
+
+# Modelos necesarios para la aplicación desplegada
+!models/*.pkl
+!models/*.keras
 
 # --- Figuras generadas ---
 reports/figures/*

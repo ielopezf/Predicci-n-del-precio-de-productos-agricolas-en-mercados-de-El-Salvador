@@ -1,45 +1,98 @@
-"""app.py — Prototipo Streamlit de despliegue (CRISP-DM: Despliegue - Etapa 2).
+"""Prototipo Streamlit — Predicción de precios agrícolas en El Salvador.
 
-Consume la API Flask (`../api/app.py`) para mostrar, por producto, el precio
-real vs. el predicho por cada modelo entrenado — en modo BACKTEST sobre el
-tramo de test histórico. No es un pronóstico del futuro: no existen valores
-reales futuros de combustible/IPC/clima para alimentar el modelo, así que
-inventar esas semanas sería engañoso (ver la sección de limitaciones al final).
-
-Ejecutar (con la API ya corriendo en otra terminal):  streamlit run app.py
+En Streamlit Community Cloud usa directamente ``api/model_registry.py`` y los
+artefactos versionados en ``models/`` y ``data/processed/``. Si se define la
+variable de entorno ``API_URL``, conserva el modo cliente HTTP para consumir la
+API Flask desplegada por separado.
 """
 
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
 
 import pandas as pd
 import requests
 import streamlit as st
 
-API_URL = os.environ.get("API_URL", "http://localhost:5000")
+ROOT_DIR = Path(__file__).resolve().parents[1]
+API_DIR = ROOT_DIR / "api"
+if str(API_DIR) not in sys.path:
+    sys.path.insert(0, str(API_DIR))
+
+API_URL = os.environ.get("API_URL", "").strip().rstrip("/")
 
 st.set_page_config(page_title="Predicción de precios agrícolas — El Salvador", layout="wide")
 
 
+# --------------------------------------------------------------------------- #
+# Capa de acceso: API externa si API_URL existe; registro local en caso contrario
+# --------------------------------------------------------------------------- #
+@st.cache_resource
+def cargar_registry():
+    import model_registry as reg
+    return reg
+
+
+def _slugs_a_productos(reg, valor):
+    if not valor:
+        return None
+    slugs = [s.strip() for s in valor.split(",") if s.strip()]
+    desconocidos = [s for s in slugs if s not in reg.SLUG_A_PRODUCTO]
+    if desconocidos:
+        raise ValueError(f"Producto(s) no reconocido(s): {desconocidos}")
+    return [reg.SLUG_A_PRODUCTO[s] for s in slugs]
+
+
 @st.cache_data(ttl=300)
 def api_get(ruta, params=None):
-    r = requests.get(f"{API_URL}{ruta}", params=params, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    """Obtiene datos desde Flask o, en Cloud, directamente desde model_registry."""
+    params = params or {}
+
+    if API_URL:
+        r = requests.get(f"{API_URL}{ruta}", params=params, timeout=30)
+        r.raise_for_status()
+        return r.json()
+
+    reg = cargar_registry()
+
+    if ruta == "/api/productos":
+        return reg.PRODUCTOS
+    if ruta == "/api/modelos":
+        return [
+            {"nombre": n, "tipo": reg.TIPO_MODELO[n], "disponible": reg.MODELOS.get(n) is not None}
+            for n in reg.TIPO_MODELO
+        ]
+    if ruta == "/api/metricas":
+        return reg.metricas_modelo(params.get("modelo", "xgboost_optimizado"))
+    if ruta == "/api/prediccion":
+        productos = _slugs_a_productos(reg, params.get("productos"))
+        df = reg.predicciones(params.get("modelo", "xgboost_optimizado"), productos=productos).copy()
+        df["Fecha"] = df["Fecha"].astype(str)
+        return df.to_dict(orient="records")
+    if ruta == "/api/importancia":
+        return reg.importancia_modelo(
+            params.get("modelo", "xgboost_optimizado"), top=int(params.get("top", 15))
+        )
+    if ruta == "/api/equidad":
+        return reg.equidad_modelo(params.get("modelo", "xgboost_optimizado"))
+
+    raise ValueError(f"Ruta no soportada: {ruta}")
 
 
 @st.cache_data(ttl=300)
 def api_get_opcional(ruta, params=None):
-    """Como api_get, pero devuelve None en vez de lanzar si el API responde 4xx.
-
-    Usado para endpoints donde un error es un resultado válido (p. ej. un
-    modelo que no expone importancia de variables), no una falla real.
-    """
-    r = requests.get(f"{API_URL}{ruta}", params=params, timeout=30)
-    if r.status_code >= 400:
+    """Como api_get, pero devuelve None cuando un recurso opcional no está disponible."""
+    try:
+        if API_URL:
+            r = requests.get(f"{API_URL}{ruta}", params=params, timeout=30)
+            if r.status_code >= 400:
+                return None
+            return r.json()
+        return api_get(ruta, params)
+    except (KeyError, ValueError):
         return None
-    return r.json()
 
 
 st.title("Predicción de precios agrícolas — El Salvador")
@@ -53,11 +106,18 @@ try:
     productos_disp = api_get("/api/productos")
     modelos_disp = [m for m in api_get("/api/modelos") if m["disponible"]]
 except requests.exceptions.RequestException as e:
-    st.error(f"No se pudo conectar con la API ({API_URL}). ¿Está corriendo `python api/app.py`?\n\n{e}")
+    st.error(f"No se pudo conectar con la API configurada ({API_URL}).\n\n{e}")
+    st.stop()
+except Exception as e:
+    st.error(
+        "No se pudieron cargar los datos/modelos del prototipo. Verifica que "
+        "`data/processed/dataset_modelado.csv` y los archivos de `models/` estén "
+        f"versionados en el repositorio.\n\nDetalle: {e}"
+    )
     st.stop()
 
 if not modelos_disp:
-    st.warning("La API está viva pero todavía no hay modelos entrenados en `models/`.")
+    st.warning("Todavía no hay modelos entrenados disponibles en `models/`.")
     st.stop()
 
 # --------------------------------------------------------------------------- #
