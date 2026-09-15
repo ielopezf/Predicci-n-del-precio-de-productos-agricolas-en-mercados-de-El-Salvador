@@ -1,0 +1,14 @@
+{
+  "metodo": "optuna",
+  "n_trials": 40,
+  "mejores_parametros": {
+    "n_estimators": 200,
+    "max_depth": 8,
+    "learning_rate": 0.13962563737015762,
+    "subsample": 0.9757995766256756,
+    "colsample_bytree": 0.9579309401710595,
+    "min_child_weight": 6,
+    "reg_lambda": 4.869640941520899
+  },
+  "mejor_mape_cv": 9.375
+}

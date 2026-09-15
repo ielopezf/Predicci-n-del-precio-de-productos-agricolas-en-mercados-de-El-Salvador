@@ -20,6 +20,7 @@ PROCESSED_DIR = DATA_DIR / "processed"               # dataset final listo para 
 EXTERNAL_DIR = DATA_DIR / "external"                 # combustibles, producción, IPC, etc.
 REPORTS_DIR = ROOT_DIR / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"                # gráficos del EDA (obligatorios)
+ETAPA2_DIR = REPORTS_DIR / "etapa2"                  # tabla comparativa, hiperparámetros, equidad
 MODELS_DIR = ROOT_DIR / "models"                     # modelos serializados (.pkl / .keras)
 
 # --------------------------------------------------------------------------- #
@@ -53,7 +54,7 @@ PRODUCTOS_OBJETIVO = [
     "MAÍZ BLANCO",                       # 0.3% faltantes
     "FRIJOL  ROJO DE SEDA NACIONAL",     # 0.3% faltantes
     "ARROZ ORO PRIMERA CLASE IMPORTADO", # 0.3% faltantes (la variante nacional tiene 59.8%)
-    "TOMATE  DE PASTA GRANDE",           # 0.3% faltantes (ensalada grande tiene 94.4%)
+    "TOMATE DE PASTA GRANDE",            # 0.3% faltantes (ensalada grande tiene 94.4%)
     "NARANJA VALENCIA MEDIANA",          # 0.4% faltantes
 ]
 

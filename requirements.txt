@@ -26,7 +26,15 @@ lime>=0.2
 jupyter>=1.0
 ipykernel>=6.0
 
-# --- Modelos avanzados (RESERVADO Etapa 2, dejar comentado por ahora) ---
-# tensorflow>=2.15     # LSTM y Redes Neuronales
-# optuna>=3.5          # optimización de hiperparámetros
-# streamlit>=1.30      # prototipo funcional (Etapa 2)
+# --- Modelos avanzados (Etapa 2) ---
+tensorflow-cpu>=2.15   # LSTM y Redes Neuronales (notebook 04)
+optuna>=3.5             # optimización de hiperparámetros (XGBoost)
+
+# --- Despliegue (Etapa 2): API + prototipo funcional ---
+# Dependencias específicas y actualizadas de cada app en api/requirements.txt
+# y streamlit_app/requirements.txt; se listan aquí también para instalar todo
+# el proyecto de una sola vez.
+flask>=3.0
+flask-cors>=4.0
+streamlit>=1.36
+requests>=2.31

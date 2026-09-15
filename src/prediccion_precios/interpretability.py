@@ -66,7 +66,11 @@ def explicar_shap(modelo, X, guardar=True, max_muestras=200):
     import shap
     X_muestra = X.iloc[:max_muestras] if hasattr(X, "iloc") else X[:max_muestras]
 
-    explainer = shap.Explainer(modelo, X_muestra)
+    # Se explica siempre vía la función predict() (en vez de TreeExplainer):
+    # algunas combinaciones de versión xgboost/shap fallan al parsear el
+    # `base_score` interno del booster con TreeExplainer. Usar el callable
+    # predict es más lento (permutación) pero funciona para cualquier modelo.
+    explainer = shap.Explainer(modelo.predict, X_muestra)
     shap_values = explainer(X_muestra)
 
     plt.figure()

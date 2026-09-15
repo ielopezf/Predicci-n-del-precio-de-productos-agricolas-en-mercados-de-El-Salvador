@@ -83,6 +83,22 @@ def resamplear_frecuencia(df, freq=config.FRECUENCIA):
 # --------------------------------------------------------------------------- #
 # 4. Faltantes
 # --------------------------------------------------------------------------- #
+def diagnosticar_nulos(df, etiqueta=""):
+    """Tabla de nulos por columna (conteo y %), para documentar cada etapa.
+
+    Se usa antes/después de cada paso de tratamiento (resampleo, interpolación,
+    integración de fuentes, features) para dejar evidencia de qué se corrigió.
+    """
+    n = df.isna().sum()
+    n = n[n > 0]
+    tabla = pd.DataFrame({"n_nulos": n, "pct_nulos": (n / len(df) * 100).round(2)})
+    tabla = tabla.sort_values("n_nulos", ascending=False)
+    if etiqueta:
+        print(f"--- Nulos: {etiqueta} ({len(df)} filas) ---")
+    print(tabla if not tabla.empty else "Sin nulos.")
+    return tabla
+
+
 def tratar_faltantes(df, freq=config.FRECUENCIA):
     """Reindexa cada producto al rango semanal completo e interpola el precio.
 

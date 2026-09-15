@@ -1,0 +1,19 @@
+Disparidad de error entre productos (peor/mejor MAPE): 13.06x
+Disparidad de error cosecha vs. no cosecha (peor/mejor MAPE): 1.74x
+
+Limitaciones y consideraciones éticas:
+- Los precios son de mercados MAYORISTAS del MAG: no reflejan directamente lo
+  que paga el consumidor final ni lo que recibe el pequeño productor (los
+  márgenes de intermediación no están capturados). No usar la predicción como
+  proxy del ingreso del productor ni del precio al consumidor sin ajuste.
+- Cobertura acotada (5 productos, 2021-2024, mercados formales): el modelo no
+  generaliza a otros cultivos, regiones o choques atípicos fuera del
+  histórico (sequías extremas, crisis de combustible, cierres de frontera).
+- Uso previsto: apoyo informativo (planificación de compras institucionales,
+  alerta temprana de variabilidad de precios). No debe usarse para
+  especulación, acaparamiento o fijación de precios que perjudique a
+  productores o consumidores.
+- Desempeño desigual entre productos y temporadas (ver `metricas_por_grupo` /
+  `metricas_por_temporada`): comunicar el error de CADA producto, no solo el
+  promedio general, para no sobre-representar la confiabilidad del modelo en
+  los casos donde es peor.

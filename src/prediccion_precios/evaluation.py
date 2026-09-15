@@ -65,6 +65,44 @@ def split_temporal(X, y, test_size=config.TEST_SIZE):
     return X_train, X_test, y_train, y_test
 
 
+def indices_train_val_test(n, val_size=0.15, test_size=config.TEST_SIZE):
+    """(n_train, n_val, n_test) para un split temporal de 3 tramos.
+
+    Única fuente de verdad del tamaño del tramo de test: la usan
+    `split_train_val_test` (para entrenar) y la API de despliegue (para
+    mostrar el mismo tramo de test de cada modelo, incluso sobre estructuras
+    -metadatos, secuencias LSTM- que no pasan por esta función directamente).
+    El tramo de test es SIEMPRE las últimas `n_test` filas, sin importar
+    `val_size` — por eso es seguro reconstruirlo fuera del entrenamiento.
+    """
+    n_test = int(np.ceil(n * test_size))
+    n_val = int(np.ceil(n * val_size))
+    n_train = n - n_test - n_val
+    if n_train <= 0:
+        raise ValueError("val_size + test_size deja 0 filas para entrenar.")
+    return n_train, n_val, n_test
+
+
+def split_train_val_test(X, y, val_size=0.15, test_size=config.TEST_SIZE):
+    """Divide en train/val/test respetando el orden temporal (3 tramos).
+
+    Necesario para una evaluación rigurosa de la Etapa 2: `val` se usa para
+    seleccionar hiperparámetros/pesos de ensemble sin tocar el test; `test`
+    se evalúa UNA sola vez al final ("prueba final"), nunca durante el
+    ajuste. Evita que el modelo "vea" indirectamente el tramo de prueba.
+    """
+    n_train, n_val, n_test = indices_train_val_test(len(X), val_size, test_size)
+
+    def _slice(a, i, j):
+        return a.iloc[i:j] if hasattr(a, "iloc") else a[i:j]
+
+    X_train, X_val, X_test = (_slice(X, 0, n_train), _slice(X, n_train, n_train + n_val),
+                               _slice(X, n_train + n_val, n_train + n_val + n_test))
+    y_train, y_val, y_test = (_slice(y, 0, n_train), _slice(y, n_train, n_train + n_val),
+                               _slice(y, n_train + n_val, n_train + n_val + n_test))
+    return X_train, X_val, X_test, y_train, y_val, y_test
+
+
 # --------------------------------------------------------------------------- #
 # Tabla comparativa
 # --------------------------------------------------------------------------- #

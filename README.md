@@ -23,6 +23,7 @@ Informáticos. Ciclo I 2026. **Grupo 01.** Docente: Ing. Bladimir Díaz Campos.
 6. [El paquete `prediccion_precios`](#6-el-paquete-prediccion_precios)
 7. [Flujo CRISP-DM y cobertura de la rúbrica](#7-flujo-crisp-dm-y-cobertura-de-la-rúbrica)
 8. [Solución de problemas](#8-solución-de-problemas)
+9. [Despliegue: API + Streamlit](#9-despliegue-api--streamlit)
 
 ---
 
@@ -111,9 +112,13 @@ Ejecuta los notebooks **en orden**, seleccionando el kernel `prediccion-precios`
 | 2 | `01_eda.ipynb` | Análisis exploratorio (EDA) | figuras en `reports/figures/` |
 | 3 | `02_preprocesamiento_features.ipynb` | Limpieza, integración y features | `data/processed/dataset_modelado.csv` |
 | 4 | `03_modelos_baseline.ipynb` | Entrena 3 baselines, métricas, SHAP | tabla de métricas, figuras, modelos en `models/` |
+| 5 | `04_modelos_avanzados.ipynb` | HPO (Optuna), Red Neuronal, LSTM, ensemble, CV rigurosa + prueba final, equidad/ética | modelos avanzados en `models/`, `reports/etapa2/` |
 
 Cada notebook importa la lógica desde `src/prediccion_precios/`, por lo que el código
 queda limpio, versionado y reproducible.
+
+Con los modelos ya entrenados (notebooks 03 y 04), la app de despliegue (API + Streamlit)
+se levanta como se explica en la [sección 9](#9-despliegue-api--streamlit).
 
 **Ejecución rápida desde la terminal** (sin abrir Jupyter), para regenerar el dataset:
 
@@ -140,12 +145,16 @@ prediccion_precios_agricolas/
 │   ├── 00_consolidacion_datos.ipynb
 │   ├── 01_eda.ipynb
 │   ├── 02_preprocesamiento_features.ipynb
-│   └── 03_modelos_baseline.ipynb
+│   ├── 03_modelos_baseline.ipynb
+│   └── 04_modelos_avanzados.ipynb
 ├── src/prediccion_precios/     # paquete Python con toda la lógica
-├── models/                     # modelos entrenados (.pkl) — generados
+├── models/                     # modelos entrenados (.pkl / .keras) — generados
+├── api/                        # API Flask de despliegue (sirve los modelos) — ver sección 9
+├── streamlit_app/              # prototipo Streamlit (consume la API) — ver sección 9
 ├── reports/
 │   ├── figures/                # figuras del EDA y resultados — generadas
-│   └── etapa1/                 # documento de resultados de la Etapa 1
+│   ├── etapa1/                 # documento de resultados de la Etapa 1
+│   └── etapa2/                 # tabla comparativa, hiperparámetros, reporte de equidad — generados
 ├── references/                 # papers y documentación consultada
 ├── requirements.txt
 ├── RECURSOS.md                 # recursos del proyecto completo
@@ -163,13 +172,14 @@ prediccion_precios_agricolas/
 | `preprocessing.py` | Limpieza, outliers, resampleo semanal, relleno de huecos, integración de fuentes |
 | `features.py` | Calendario cíclico, lags, medias móviles, temporada de cosecha, matriz de modelado |
 | `models_baseline.py` | Regresión Lineal, Random Forest y XGBoost (Etapa 1) |
-| `models_advanced.py` | XGBoost optimizado, LSTM, Redes Neuronales, ensemble (reservado Etapa 2) |
-| `evaluation.py` | Métricas MAE/RMSE/MAPE/R², split temporal, validación cruzada temporal, tabla comparativa |
+| `models_advanced.py` | XGBoost optimizado (Optuna/GridSearchCV), Red Neuronal y LSTM (Keras), ensemble (voting/stacking) — Etapa 2 |
+| `evaluation.py` | Métricas MAE/RMSE/MAPE/R², split temporal (2 y 3 tramos), validación cruzada temporal, tabla comparativa |
 | `interpretability.py` | Importancia de variables, SHAP y LIME |
+| `fairness.py` | Evaluación ética y de sesgos: métricas por producto/temporada, brecha de equidad, limitaciones — Etapa 2 |
 
-Las dependencias pesadas (scikit-learn, xgboost, shap, lime) se importan de forma
-diferida, por lo que el paquete se importa sin error aunque falten; solo se exigen al
-llamar a la función correspondiente.
+Las dependencias pesadas (scikit-learn, xgboost, shap, lime, optuna, tensorflow) se
+importan de forma diferida, por lo que el paquete se importa sin error aunque falten;
+solo se exigen al llamar a la función correspondiente.
 
 ## 7. Flujo CRISP-DM y cobertura de la rúbrica
 
@@ -178,9 +188,9 @@ llamar a la función correspondiente.
 | Comprensión del negocio | Perfil de trabajo + `config.py` |
 | Comprensión de los datos | `notebooks/00`, `notebooks/01`, `data_loading.py`, `eda.py` |
 | Preparación de los datos | `notebooks/02`, `preprocessing.py`, `features.py` |
-| Modelado | `notebooks/03`, `models_baseline.py` (Etapa 2: `models_advanced.py`) |
-| Evaluación | `evaluation.py`, `interpretability.py` |
-| Despliegue | Etapa 2 (prototipo Streamlit) |
+| Modelado | `notebooks/03` + `models_baseline.py` (Etapa 1); `notebooks/04` + `models_advanced.py` (Etapa 2: HPO, LSTM, red neuronal, ensemble) |
+| Evaluación | `evaluation.py`, `interpretability.py`, `fairness.py` (equidad/ética, Etapa 2) |
+| Despliegue | `api/` (Flask) + `streamlit_app/` (Streamlit) — ver [sección 9](#9-despliegue-api--streamlit) |
 
 **Rúbrica Etapa 1 (100 pts, 25% de la nota):**
 
@@ -206,6 +216,39 @@ llamar a la función correspondiente.
   estén en las rutas indicadas.
 - **Los precios muestran muchos faltantes** — Está previsto: se seleccionaron, por
   cultivo, las variantes con mayor cobertura (~0.3%). Ver `config.PRODUCTOS_OBJETIVO`.
+
+## 9. Despliegue: API + Streamlit
+
+Dos carpetas independientes de `src/prediccion_precios/` (que solo importan del paquete,
+no lo modifican):
+
+- **`api/`** — API Flask que carga los modelos entrenados en `models/` y expone
+  endpoints de solo lectura en modo **backtest** (precio real vs. predicho sobre el
+  tramo de test histórico que ningún modelo vio al entrenarse):
+  `GET /api/productos`, `/api/modelos`, `/api/prediccion?modelo=...&productos=slug1,slug2`,
+  `/api/metricas?modelo=...`, `/api/importancia?modelo=...`, `/api/equidad?modelo=...`.
+- **`streamlit_app/`** — prototipo Streamlit que consume la API: permite elegir uno o
+  varios productos y un modelo, y muestra las series real vs. predicho, la tabla de
+  métricas, la importancia de variables y la evaluación de equidad/ética.
+
+No ofrecen pronóstico hacia el futuro: no existen valores reales futuros de
+combustible/IPC/clima con los que alimentar al modelo, así que inventarlos sería
+engañoso (ver `fairness.LIMITACIONES_ETICAS`).
+
+**Ejecutar (requiere los modelos ya entrenados — notebooks 03 y 04):**
+
+```bash
+# Terminal 1 — API
+cd api
+python app.py                       # sirve en http://localhost:5000
+
+# Terminal 2 — Streamlit
+cd streamlit_app
+streamlit run app.py                # abre http://localhost:8501
+```
+
+Por defecto Streamlit apunta a `http://localhost:5000`; para usar otra URL de API,
+define la variable de entorno `API_URL` antes de ejecutar `streamlit run`.
 
 ---
 
