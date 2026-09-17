@@ -77,7 +77,7 @@ def marcar_temporada_cosecha(df):
     return df
 
 
-def construir_matriz_modelado(df, dropna=True):
+def construir_matriz_modelado(df, dropna=True, return_meta=False):
     """Devuelve (X, y) listos para entrenar.
 
     - y = precio (variable objetivo).
@@ -94,9 +94,16 @@ def construir_matriz_modelado(df, dropna=True):
 
     y = df[config.COL_PRECIO].copy()
 
+    # Metadatos tomados DESPUÉS del mismo ordenamiento/filtrado usado para X e y.
+    # Esto evita desalineaciones en visualizaciones cuando varias filas comparten fecha.
+    meta = df[[config.COL_FECHA, config.COL_PRODUCTO, config.COL_PRECIO]].copy()
+
     quitar = [config.COL_PRECIO, config.COL_FECHA, config.COL_PRODUCTO]
     X = df.drop(columns=[c for c in quitar if c in df.columns])
     # One-hot del grupo de cultivo (categórica)
     if "Grupo" in X.columns:
         X = pd.get_dummies(X, columns=["Grupo"], prefix="grupo")
+
+    if return_meta:
+        return X, y, meta
     return X, y

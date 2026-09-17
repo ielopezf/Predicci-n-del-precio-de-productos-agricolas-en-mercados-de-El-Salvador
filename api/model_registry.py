@@ -44,10 +44,14 @@ def slugify(texto: str) -> str:
 # Datos: dataset limpio (sin NaN) + tramo de test, alineado con Fecha/Producto
 # --------------------------------------------------------------------------- #
 _data = pd.read_csv(config.DATASET_MODELADO, parse_dates=[config.COL_FECHA])
-_df_clean = (_data.sort_values(config.COL_FECHA).reset_index(drop=True)
-                   .dropna().reset_index(drop=True))
-_meta = _df_clean[[config.COL_FECHA, config.COL_PRODUCTO, config.COL_PRECIO]].copy()
-X, y = ft.construir_matriz_modelado(_df_clean, dropna=False)
+
+# X, y y los metadatos se obtienen de UNA MISMA copia ya ordenada y filtrada.
+# Es importante no ordenar _meta por separado: cuando varios productos comparten
+# la misma fecha, un segundo sort puede cambiar el orden relativo de esas filas y
+# hacer que la gráfica asocie una predicción con otro producto/precio real.
+X, y, _meta = ft.construir_matriz_modelado(
+    _data, dropna=True, return_meta=True
+)
 
 _N_TRAIN, _N_VAL, _N_TEST = ev.indices_train_val_test(len(X))
 X_TEST, Y_TEST = X.iloc[-_N_TEST:].reset_index(drop=True), y.iloc[-_N_TEST:].reset_index(drop=True)
