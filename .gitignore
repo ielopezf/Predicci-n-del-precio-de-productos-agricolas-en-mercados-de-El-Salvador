@@ -36,3 +36,13 @@ env/
 .idea/
 .DS_Store
 .env
+
+# --- Pruebas, MLflow y secretos de Streamlit ---
+.pytest_cache/
+mlruns/
+.streamlit/secrets.toml
+
+# --- Salidas de prueba y carpetas de herramientas locales ---
+reports/etapa3/*_stub.csv
+.agents/
+.claude/

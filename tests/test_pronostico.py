@@ -36,12 +36,32 @@ def test_avisos_tomate_cosecha_y_dato_viejo():
     assert len(a) == 3
     assert pr.avisos("ARROZ", pd.Timestamp("2024-07-10"), pd.Timestamp("2024-06-30"), pd.Timestamp("2024-07-05")) == []
 
-def test_leer_reporte_mag():
-    csv = io.StringIO("Fecha,Producto,Precio\n2025-01-05,TOMATE DE PASTA GRANDE,12.5\n2025-01-05,MAIZ BLANCO,0.5\n")
-    csv.name = "r.csv"
-    out = pr.leer_reporte_mag(csv)
+def _csv(txt, nombre="r.csv"):
+    f = io.StringIO(txt); f.name = nombre; return f
+
+def test_leer_reporte_mag_valido():
+    out = pr.leer_reporte_mag(_csv("Fecha,Producto,Precio\n2025-01-05,TOMATE DE PASTA GRANDE,12.5\n2025-01-05,MAIZ BLANCO,0.5\n"))
     assert out["TOMATE"][1] == 12.5 and out["MAÍZ"][1] == 0.5
-    with pytest.raises(ValueError): pr.leer_reporte_mag(io.StringIO("a,b\n1,2\n"))
+
+@pytest.mark.parametrize("txt,nombre", [
+    ("a,b\n1,2\n", "r.csv"),
+    ("Fecha,Producto,Precio,Extra\n2025-01-05,TOMATE,1,x\n", "r.csv"),
+    ("Fecha,Producto,Precio\nayer,TOMATE,1\n", "r.csv"),
+    ("Fecha,Producto,Precio\n2025-01-05,TOMATE,-3\n", "r.csv"),
+    ("Fecha,Producto,Precio\n2099-01-05,TOMATE,3\n", "r.csv"),
+    ("Fecha,Producto,Precio\n2025-01-05,PAPAS,3\n", "r.csv"),
+    ("Fecha,Producto,Precio\n2025-01-05,TOMATE,3\n", "r.txt"),
+])
+def test_leer_reporte_mag_rechaza(txt, nombre):
+    with pytest.raises(ValueError):
+        pr.leer_reporte_mag(_csv(txt, nombre))
+
+def test_rango_plausible_y_plantilla():
+    h = pr.cargar_historia()
+    with pytest.raises(ValueError, match="plausible"):
+        pr.leer_reporte_mag(_csv("Fecha,Producto,Precio\n2025-01-05,TOMATE,3000\n"), h)
+    ok = pr.leer_reporte_mag(_csv(pr.plantilla_csv(h)), h)   # la plantilla pasa su propia validación
+    assert set(ok) == set(pr.PRODUCTOS_ESPERADOS)
 
 def test_explicacion_con_datos_reales():
     h = pr.cargar_historia()

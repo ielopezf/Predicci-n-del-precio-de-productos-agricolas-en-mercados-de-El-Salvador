@@ -156,22 +156,64 @@ def explicacion(fila: pd.Series) -> str:
             f"este método se equivocó en promedio {fila['mape_prueba_%']:.1f} % a este plazo.")
 
 
-def leer_reporte_mag(archivo) -> dict:
-    """Lee un CSV/XLSX simple con columnas Fecha, Producto, Precio y devuelve {grupo: (fecha, precio)}
-    con la última fila de cada producto reconocido (por nombre: ARROZ, FRIJOL, MAÍZ, NARANJA, TOMATE)."""
+PRODUCTOS_ESPERADOS = ("ARROZ", "FRIJOL", "MAÍZ", "NARANJA", "TOMATE")
+MAX_FILAS_REPORTE = 5000
+FACTOR_PLAUSIBLE = 3.0     # un precio fuera de [mín/3, máx*3] del historial se rechaza
+
+
+def plantilla_csv(historia: pd.DataFrame | None = None) -> str:
+    """Texto CSV de ejemplo con el formato exigido (Fecha ISO, Producto, Precio en USD)."""
+    if historia is None:
+        historia = cargar_historia()
+    u = historia.sort_values(config.COL_FECHA).groupby("Grupo").tail(1)
+    filas = ["Fecha,Producto,Precio"] + [
+        f"{r[config.COL_FECHA].date()},{r[config.COL_PRODUCTO].strip()},{r[config.COL_PRECIO]:.2f}"
+        for _, r in u.iterrows()]
+    return "\n".join(filas) + "\n"
+
+
+def leer_reporte_mag(archivo, historia: pd.DataFrame | None = None) -> dict:
+    """Lee y VALIDA un CSV/XLSX con columnas Fecha, Producto, Precio.
+
+    Devuelve {grupo: (fecha, precio)} con la última fila de cada producto reconocido.
+    Rechaza (ValueError con mensaje claro): extensión no admitida, columnas faltantes o sobrantes,
+    más de MAX_FILAS_REPORTE filas, fechas/precios no válidos, fechas futuras, precios <= 0,
+    ningún producto reconocido y, si se da `historia`, precios fuera de un rango plausible.
+    """
     nombre = str(getattr(archivo, "name", archivo)).lower()
-    df = pd.read_excel(archivo) if nombre.endswith(("xlsx", "xls")) else pd.read_csv(archivo)
+    if not nombre.endswith((".csv", ".xlsx")):
+        raise ValueError("Formato no admitido: use un archivo .csv o .xlsx.")
+    try:
+        df = pd.read_excel(archivo) if nombre.endswith(".xlsx") else pd.read_csv(archivo)
+    except Exception as e:
+        raise ValueError(f"No se pudo leer el archivo ({type(e).__name__}).") from e
     df.columns = [str(c).strip().lower() for c in df.columns]
-    faltan = {"fecha", "producto", "precio"} - set(df.columns)
-    if faltan:
-        raise ValueError(f"Faltan columnas: {sorted(faltan)}. Se requieren Fecha, Producto, Precio.")
+    if set(df.columns) != {"fecha", "producto", "precio"}:
+        raise ValueError(f"Las columnas deben ser exactamente Fecha, Producto, Precio; se encontró {list(df.columns)}.")
+    if len(df) == 0 or len(df) > MAX_FILAS_REPORTE:
+        raise ValueError(f"El archivo debe tener entre 1 y {MAX_FILAS_REPORTE} filas (tiene {len(df)}).")
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
     df["precio"] = pd.to_numeric(df["precio"], errors="coerce")
-    df = df.dropna(subset=["fecha", "precio"]).sort_values("fecha")
+    malas = int(df[["fecha", "precio"]].isna().any(axis=1).sum())
+    if malas:
+        raise ValueError(f"{malas} fila(s) con fecha o precio no válidos (fecha AAAA-MM-DD, precio numérico con punto decimal).")
+    if (df["precio"] <= 0).any():
+        raise ValueError("Hay precios menores o iguales a cero.")
+    if (df["fecha"] > pd.Timestamp.today() + pd.Timedelta(days=1)).any():
+        raise ValueError("Hay fechas futuras.")
+    df = df.sort_values("fecha")
     out = {}
-    for g in ("ARROZ", "FRIJOL", "MAÍZ", "NARANJA", "TOMATE"):
-        clave = _sin_tildes(g)
-        sub = df[df["producto"].astype(str).map(_sin_tildes).str.contains(clave)]
-        if not sub.empty and sub["precio"].iloc[-1] > 0:
-            out[g] = (sub["fecha"].iloc[-1], float(sub["precio"].iloc[-1]))
+    for g in PRODUCTOS_ESPERADOS:
+        sub = df[df["producto"].astype(str).map(_sin_tildes).str.contains(_sin_tildes(g), regex=False)]
+        if sub.empty:
+            continue
+        f, p = sub["fecha"].iloc[-1], float(sub["precio"].iloc[-1])
+        if historia is not None:
+            h = historia.loc[historia["Grupo"] == g, config.COL_PRECIO]
+            if not (h.min() / FACTOR_PLAUSIBLE <= p <= h.max() * FACTOR_PLAUSIBLE):
+                raise ValueError(f"{g}: el precio {p:.2f} está fuera del rango plausible "
+                                 f"({h.min() / FACTOR_PLAUSIBLE:.2f} – {h.max() * FACTOR_PLAUSIBLE:.2f}). Revise unidades.")
+        out[g] = (f, p)
+    if not out:
+        raise ValueError("No se reconoció ningún producto (el nombre debe contener ARROZ, FRIJOL, MAÍZ, NARANJA o TOMATE).")
     return out

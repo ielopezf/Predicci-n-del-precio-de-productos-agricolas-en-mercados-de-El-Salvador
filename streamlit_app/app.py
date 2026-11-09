@@ -121,7 +121,19 @@ def vista_pronostico():
 
     grupos = sorted(hist["Grupo"].unique())
     with st.expander("Precio vigente (opcional)"):
-        archivo = st.file_uploader("Reporte MAG (CSV/XLSX: Fecha, Producto, Precio)", type=["csv", "xlsx"])
+        st.markdown(
+            "**Formato requerido** (.csv o .xlsx, máx. 2 MB): exactamente tres columnas "
+            "`Fecha` (AAAA-MM-DD), `Producto` (el nombre debe contener ARROZ, FRIJOL, MAÍZ, NARANJA o TOMATE) "
+            "y `Precio` (USD, número con punto decimal). Se usa la última fila de cada producto. "
+            "Los precios muy fuera del rango histórico se rechazan."
+        )
+        st.code(pr.plantilla_csv(hist), language="csv")
+        st.download_button("Descargar plantilla", pr.plantilla_csv(hist).encode("utf-8"),
+                           "plantilla_precios.csv", "text/csv")
+        archivo = st.file_uploader("Cargar archivo", type=["csv", "xlsx"])
+        if archivo is not None and archivo.size > 2 * 1024 * 1024:
+            st.error("El archivo supera 2 MB.")
+            archivo = None
         manual = {}
         for g in grupos:
             v = st.number_input(f"{g} — precio manual", min_value=0.0, value=0.0, step=0.1, key=f"m_{g}")
@@ -130,7 +142,7 @@ def vista_pronostico():
     precios, fecha_base = dict(manual), None
     if archivo is not None:
         try:
-            ult = pr.leer_reporte_mag(archivo)
+            ult = pr.leer_reporte_mag(archivo, hist)
             precios.update({g: p for g, (f, p) in ult.items() if g not in manual})
             fecha_base = max(f for f, _ in ult.values()) if ult else None
             st.success(f"Reporte leído: {len(ult)} producto(s) reconocido(s).")
@@ -151,10 +163,10 @@ def vista_pronostico():
         f = tabla[(tabla["grupo"] == g) & (tabla["horizonte_sem"] == h_sel)].iloc[0]
         st.subheader(f"{icono[f['semaforo']]} {f['producto'].title()}")
         c1, c2, c3 = st.columns(3)
-        c1.metric(f"Pronóstico {f['fecha_objetivo']}", f"${f['pronostico']:.2f}")
-        c2.metric("Intervalo 80 %", f"${f['lim_inf_80']:.2f} – ${f['lim_sup_80']:.2f}")
-        c3.metric("Intervalo 90 %", f"${f['lim_inf_90']:.2f} – ${f['lim_sup_90']:.2f}")
-        st.write(pr.explicacion(f))
+        c1.metric(f"Pronóstico {f['fecha_objetivo']} (US dólares)", f"{f['pronostico']:.2f}")
+        c2.metric("Intervalo 80 %", f"{f['lim_inf_80']:.2f} – {f['lim_sup_80']:.2f}")
+        c3.metric("Intervalo 90 %", f"{f['lim_inf_90']:.2f} – {f['lim_sup_90']:.2f}")
+        st.write(pr.explicacion(f).replace("$", "\\$"))
         for a in str(f["avisos"]).split(" | "):
             if a and a != "nan":
                 st.warning(a)
@@ -166,7 +178,6 @@ def vista_pronostico():
 
 
 def vista_backtest():
-    st.sidebar.caption("Controles de la pestaña Backtest y comparación de modelos")
     st.caption(
         "Backtest histórico: precio real vs. predicho sobre el tramo de test que el modelo "
         "nunca vio al entrenarse. **No es un pronóstico del futuro** — no hay valores reales "
@@ -194,17 +205,18 @@ def vista_backtest():
     # --------------------------------------------------------------------------- #
     # Barra lateral: selección de productos y modelo
     # --------------------------------------------------------------------------- #
-    st.sidebar.header("Selección")
+    st.subheader("Selección")
+    col_p, col_m = st.columns([2, 1])
     nombres_producto = [p["producto"] for p in productos_disp]
     slug_por_producto = {p["producto"]: p["slug"] for p in productos_disp}
 
-    productos_sel = st.sidebar.multiselect("Producto(s)", nombres_producto, default=nombres_producto[:2])
+    productos_sel = col_p.multiselect("Producto(s)", nombres_producto, default=nombres_producto[:2])
     nombres_modelo = [m["nombre"] for m in modelos_disp]
     etiquetas_modelo = {m["nombre"]: f"{m['nombre']} ({m['tipo']})" for m in modelos_disp}
-    modelo_sel = st.sidebar.selectbox("Modelo", nombres_modelo, format_func=lambda n: etiquetas_modelo[n])
+    modelo_sel = col_m.selectbox("Modelo", nombres_modelo, format_func=lambda n: etiquetas_modelo[n])
 
     if not productos_sel:
-        st.info("Selecciona al menos un producto en la barra lateral.")
+        st.info("Selecciona al menos un producto.")
         return
 
     slugs_sel = ",".join(slug_por_producto[p] for p in productos_sel)

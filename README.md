@@ -1,5 +1,8 @@
 # Predicción del precio de productos agrícolas en mercados de El Salvador
 
+**Aplicación publicada:** https://prediccionpreciosagricolassv.streamlit.app/
+
+
 Modelo predictivo del comportamiento futuro de los precios de productos agrícolas
 seleccionados (maíz, frijol, arroz, tomate y naranja) a partir de datos históricos
 oficiales, siguiendo la metodología **CRISP-DM**. Meta del objetivo general:
@@ -94,9 +97,9 @@ ubicados así (algunos vienen incluidos en el repositorio):
 | `Produccion.csv` | `data/external/` | FAOSTAT — producción agrícola anual |
 | `lluvia_mensual_sv.xlsx` | `data/external/` | Lluvia mensual (opcional: solo la usan la auditoría y la prueba a10) |
 
-> Si `data/interim/precios_consolidados.xlsx` no existe, genéralo primero a partir de
-> los informes diarios del MAG con el script `Extraer datos/extraer_precios.py`
-> (ver notebook `00_consolidacion_datos.ipynb`).
+> Si `data/interim/precios_consolidados.xlsx` no existe, descarga los informes diarios del MAG con
+> `scripts/extraccion/descargar_mag.py` y consolídalos con el notebook `00_consolidacion_datos.ipynb`
+> (ver sección 12).
 
 ## 4. Cómo ejecutar el proyecto
 
@@ -321,7 +324,23 @@ DIGESTYC, DGEHM) y FAOSTAT.*
 - **Módulo**: `src/prediccion_precios/pronostico.py` (funciones puras, probadas en `tests/test_pronostico.py`).
 - **Método**: persistencia (último precio) + intervalos empíricos 80/90 % + semáforo de confiabilidad por producto y horizonte + avisos (tomate, meses de cosecha, dato viejo). Es lo que respalda el informe: ningún modelo supera a la persistencia de forma robusta.
 - **Exportar**: `python scripts/a12_pronostico.py [--mag reporte.csv]` → `reports/pronostico.csv`.
-- **Streamlit**: `streamlit run streamlit_app/app.py` → vista "Pronóstico (1–4 semanas)"; permite cargar precio manual o un CSV/XLSX con columnas `Fecha, Producto, Precio`.
+- **Aplicación publicada**: https://prediccionpreciosagricolassv.streamlit.app/ (QR: `python scripts/generar_qr.py`, requiere `pip install "qrcode[pil]"`).
+- **Streamlit (local)**: `streamlit run streamlit_app/app.py` → vista "Pronóstico (1–4 semanas)"; permite cargar precio manual o un CSV/XLSX con columnas `Fecha, Producto, Precio`.
 - **API**: `GET /api/pronostico[?producto=TOMATE&precio=30&fecha_base=2025-01-05]`.
 - **Limitación**: los datos terminan en junio de 2024; sin precio vigente la app avisa que el pronóstico corresponde a esa fecha. Los intervalos cubrieron 63 % (nominal 80 %) y 73 % (nominal 90 %) en la prueba.
 - **CI**: `.github/workflows/tests.yml` corre pytest en cada push.
+
+## 12. Extracción de datos (opcional)
+
+Scripts para volver a descargar las fuentes. No se necesitan para la app ni para reproducir los modelos si ya tienes `data/`.
+Instalar: `pip install -r requirements-extraccion.txt` (Selenium requiere Chrome).
+
+| Script | Fuente | Salida |
+|---|---|---|
+| `scripts/extraccion/descargar_mag.py` | Informe diario de precios del MAG (Excel) | carpeta `excels_mag/` |
+| `scripts/extraccion/obtener_precipitaciones_snet.py` | SNET/MARN, lluvia diaria por estación | `precipitaciones_el_salvador_2020_2026.xlsx/.csv` |
+| `scripts/extraccion/obtener_precios_combustible.py` | SINAPP-DGEHM, combustibles | `precios_combustibles_sv.xlsx` |
+| `scripts/extraccion/consolidar_precio_mag.py` | Excel del MAG en `excels_mag/` | tabla de un producto (Producto, Día, Mes, Año, Precio); lee celdas fijas, ver su docstring |
+| `scripts/extraccion/agregar_fechas_faltantes.py` | — | completa días sin precio de una serie (`ENTRADA SALIDA --producto`) |
+
+Nota: en el extractor de combustibles, un valor vacío en la fuente se guarda como `0.0` (no como nulo). Eso explica los ceros de diésel que reporta la auditoría; los modelos los reciben tal cual vienen en `data/external/`.

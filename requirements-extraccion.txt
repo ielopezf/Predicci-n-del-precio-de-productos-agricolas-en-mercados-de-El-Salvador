@@ -1,0 +1,8 @@
+# Solo para volver a descargar los datos (scripts/extraccion/). No hace falta para la app ni los modelos.
+requests>=2.31
+beautifulsoup4>=4.12
+lxml>=5.0
+pandas>=2.2
+openpyxl>=3.1
+selenium>=4.20
+webdriver-manager>=4.0
