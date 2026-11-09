@@ -46,6 +46,24 @@ def calcular_metricas(y_true, y_pred):
             "MAPE_%": round(mape, 4), "R2": round(r2, 4)}
 
 
+def mase(y_true, y_pred, escala):
+    """Error absoluto medio escalado (Hyndman y Koehler, 2006).
+
+    `escala` = MAE del pronóstico ingenuo a 1 semana calculado SOLO con datos
+    previos al tramo evaluado (y por producto, si se combinan productos).
+    MASE < 1: mejor que repetir el precio de la semana anterior; > 1: peor.
+    """
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    return float(np.mean(np.abs(y_true - y_pred)) / escala)
+
+
+def escala_ingenua(serie_previa):
+    """MAE del pronóstico ingenuo a 1 semana sobre una serie de entrenamiento."""
+    d = np.abs(np.diff(np.asarray(serie_previa, dtype=float)))
+    return float(np.mean(d))
+
+
 # --------------------------------------------------------------------------- #
 # Split temporal
 # --------------------------------------------------------------------------- #

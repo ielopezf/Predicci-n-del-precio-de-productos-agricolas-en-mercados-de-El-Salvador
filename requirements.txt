@@ -5,8 +5,9 @@
 # ============================================================
 
 # --- Núcleo de datos ---
-pandas>=2.0
+pandas>=2.2           # >=2.2: groupby.apply(include_groups=...) usado en scripts/
 numpy>=1.24
+scipy>=1.10           # optimización (ETS), prueba Diebold-Mariano (scripts/a8)
 openpyxl>=3.1          # lectura/escritura de .xlsx del MAG
 pyarrow>=14.0          # datasets .parquet en data/processed
 
@@ -21,6 +22,9 @@ xgboost>=2.0           # baseline fuerte
 # --- Interpretabilidad (Etapa 1) ---
 shap>=0.44
 lime>=0.2
+
+# --- Pruebas automáticas ---
+pytest>=7.4            # tests/test_baselines.py
 
 # --- Entorno de trabajo ---
 jupyter>=1.0

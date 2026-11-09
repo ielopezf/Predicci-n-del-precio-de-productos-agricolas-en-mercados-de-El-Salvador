@@ -96,6 +96,76 @@ def api_get_opcional(ruta, params=None):
 
 
 st.title("Predicción de precios agrícolas — El Salvador")
+
+vista = st.sidebar.radio("Vista", ["Pronóstico (1–4 semanas)", "Backtest y comparación de modelos"])
+
+if vista.startswith("Pronóstico"):
+    sys.path.insert(0, str(ROOT_DIR / "src"))
+    from prediccion_precios import pronostico as pr
+
+    st.caption(
+        "Pronóstico a 1–4 semanas con **persistencia** (el último precio) e intervalos empíricos. "
+        "Es el método que el informe respalda: ningún modelo de ML lo superó de forma robusta en la prueba. "
+        "El intervalo es orientativo: en la prueba cubrió 63 % (nominal 80 %) y 73 % (nominal 90 %)."
+    )
+
+    @st.cache_data
+    def _historia():
+        return pr.cargar_historia()
+
+    hist = _historia()
+    ult_fecha = hist["Fecha"].max()
+    st.warning(
+        f"Los datos históricos terminan el {ult_fecha.date()}. Para un pronóstico útil hoy, cargue el "
+        "precio vigente (abajo). Sin eso, el pronóstico corresponde a esa fecha, no a hoy."
+    )
+
+    grupos = sorted(hist["Grupo"].unique())
+    with st.sidebar.expander("Precio vigente (opcional)"):
+        archivo = st.file_uploader("Reporte MAG (CSV/XLSX: Fecha, Producto, Precio)", type=["csv", "xlsx"])
+        manual = {}
+        for g in grupos:
+            v = st.number_input(f"{g} — precio manual", min_value=0.0, value=0.0, step=0.1, key=f"m_{g}")
+            if v > 0:
+                manual[g] = v
+    precios, fecha_base = dict(manual), None
+    if archivo is not None:
+        try:
+            ult = pr.leer_reporte_mag(archivo)
+            precios.update({g: p for g, (f, p) in ult.items() if g not in manual})
+            fecha_base = max(f for f, _ in ult.values()) if ult else None
+            st.success(f"Reporte leído: {len(ult)} producto(s) reconocido(s).")
+        except Exception as e:
+            st.error(f"No se pudo leer el reporte: {e}")
+    if manual and fecha_base is None:
+        fecha_base = pd.Timestamp.today().normalize()
+
+    sel = st.multiselect("Producto(s)", grupos, default=grupos)
+    h_sel = st.slider("Horizonte (semanas)", 1, 4, 1)
+    if not sel:
+        st.info("Seleccione al menos un producto.")
+        st.stop()
+    tabla = pr.pronosticar_todos(hist, precios, fecha_base)
+    tabla = tabla[tabla["grupo"].isin(sel)]
+    icono = {"verde": "🟢", "amarillo": "🟡", "rojo": "🔴", "gris": "⚪"}
+    for g in sel:
+        f = tabla[(tabla["grupo"] == g) & (tabla["horizonte_sem"] == h_sel)].iloc[0]
+        st.subheader(f"{icono[f['semaforo']]} {f['producto'].title()}")
+        c1, c2, c3 = st.columns(3)
+        c1.metric(f"Pronóstico {f['fecha_objetivo']}", f"${f['pronostico']:.2f}")
+        c2.metric("Intervalo 80 %", f"${f['lim_inf_80']:.2f} – ${f['lim_sup_80']:.2f}")
+        c3.metric("Intervalo 90 %", f"${f['lim_inf_90']:.2f} – ${f['lim_sup_90']:.2f}")
+        st.write(pr.explicacion(f))
+        for a in str(f["avisos"]).split(" | "):
+            if a and a != "nan":
+                st.warning(a)
+    with st.expander("Tabla completa (1–4 semanas)"):
+        st.dataframe(tabla.drop(columns=["grupo"]), width="stretch")
+        st.download_button("Descargar CSV", tabla.to_csv(index=False).encode("utf-8"), "pronostico.csv", "text/csv")
+    st.caption("Semáforo: verde = error de prueba < 5 %, amarillo = 5–15 % (meta del proyecto), rojo = > 15 %. "
+               "Describe el desempeño pasado, no garantiza el futuro.")
+    st.stop()
+
 st.caption(
     "Backtest histórico: precio real vs. predicho sobre el tramo de test que el modelo "
     "nunca vio al entrenarse. **No es un pronóstico del futuro** — no hay valores reales "

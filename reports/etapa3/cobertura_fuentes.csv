@@ -1,0 +1,6 @@
+fuente,inicio,fin,frecuencia,nota
+Precios MAG (consolidado),2021-05-07,2024-06-26,diaria (lun-vie),variable objetivo; limita todo el proyecto
+Combustibles,2010-12-28,2026-05-11,diaria,'Diesel' regular = 0 en 2 672 filas (se sustituyó por bajo en azufre)
+Precipitación diaria,2021-01-01,2024-12-31,diaria,promedio de 83-100 estaciones por día
+Lluvia mensual,Enero 2021,Diciembre 2024,mensual,
+FAOSTAT producción,2021,2024,anual,"2023-2024: valores imputados/estimados/no oficiales (flags I, E, X)"

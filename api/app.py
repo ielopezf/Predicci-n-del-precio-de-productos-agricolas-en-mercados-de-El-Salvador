@@ -97,5 +97,29 @@ def equidad():
     return jsonify(reg.equidad_modelo(modelo))
 
 
+@app.get("/api/pronostico")
+def pronostico():
+    """Pronóstico 1–4 semanas por persistencia. ?producto=TOMATE (opcional) &precio=12.5 (opcional, requiere producto)
+    &fecha_base=2025-01-05 (opcional)."""
+    from prediccion_precios import pronostico as pr
+    import pandas as pd
+    hist = pr.cargar_historia()
+    grupo = request.args.get("producto", "").upper() or None
+    try:
+        precio = float(request.args["precio"]) if "precio" in request.args else None
+        fb = pd.Timestamp(request.args["fecha_base"]) if "fecha_base" in request.args else None
+        if precio is not None and grupo is None:
+            return jsonify({"error": "'precio' requiere indicar 'producto'."}), 400
+        if grupo:
+            tabla = pr.pronosticar(hist, grupo, precio, fb).tabla()
+        else:
+            tabla = pr.pronosticar_todos(hist)
+    except (ValueError, KeyError) as e:
+        return jsonify({"error": str(e)}), 400
+    tabla["fecha_base"] = tabla["fecha_base"].astype(str)
+    tabla["fecha_objetivo"] = tabla["fecha_objetivo"].astype(str)
+    return jsonify(tabla.to_dict(orient="records"))
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)

@@ -1,0 +1,113 @@
+horizonte,modelo,params,puntaje_cv
+1,Ridge_var,{'alpha': 1},6.533617809267295
+1,Ridge_var,{'alpha': 10},4.869466675438971
+1,Ridge_var,{'alpha': 30},3.9065537892710984
+1,Ridge_var,{'alpha': 100},3.143462617513874
+1,Ridge_var,{'alpha': 300},2.6456371230800486
+1,Ridge_var,{'alpha': 1000},2.1662210951206617
+1,Ridge_var,{'alpha': 3000},2.4386106209981495
+1,RF_var,"{'min_samples_leaf': 20, 'max_features': 1.0, 'max_depth': None}",1.6483304593984813
+1,RF_var,"{'min_samples_leaf': 5, 'max_features': 0.3, 'max_depth': 5}",1.8493446678045056
+1,RF_var,"{'min_samples_leaf': 10, 'max_features': 0.3, 'max_depth': None}",1.581732080271341
+1,RF_var,"{'min_samples_leaf': 10, 'max_features': 0.5, 'max_depth': None}",1.5472961194694035
+1,RF_var,"{'min_samples_leaf': 3, 'max_features': 0.5, 'max_depth': 5}",1.9119505968014652
+1,RF_var,"{'min_samples_leaf': 20, 'max_features': 0.5, 'max_depth': None}",1.5794958642955823
+1,RF_var,"{'min_samples_leaf': 5, 'max_features': 1.0, 'max_depth': 5}",2.13216591882787
+1,RF_var,"{'min_samples_leaf': 3, 'max_features': 0.3, 'max_depth': 5}",1.8788600227704968
+1,RF_var,"{'min_samples_leaf': 3, 'max_features': 1.0, 'max_depth': 3}",2.1007112351513526
+1,RF_var,"{'min_samples_leaf': 5, 'max_features': 0.5, 'max_depth': 5}",1.9320799001605071
+1,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 400, 'max_depth': 4, 'learning_rate': 0.02, 'l2_regularization': 0}",2.2503010712227094
+1,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 400, 'max_depth': 2, 'learning_rate': 0.02, 'l2_regularization': 0}",1.6626189685630788
+1,HGB_var,"{'min_samples_leaf': 40, 'max_iter': 400, 'max_depth': 3, 'learning_rate': 0.1, 'l2_regularization': 1}",3.0116422259010727
+1,HGB_var,"{'min_samples_leaf': 20, 'max_iter': 400, 'max_depth': 3, 'learning_rate': 0.1, 'l2_regularization': 10}",2.599127343769036
+1,HGB_var,"{'min_samples_leaf': 20, 'max_iter': 200, 'max_depth': 4, 'learning_rate': 0.1, 'l2_regularization': 10}",2.2604293614637236
+1,HGB_var,"{'min_samples_leaf': 20, 'max_iter': 200, 'max_depth': 3, 'learning_rate': 0.02, 'l2_regularization': 10}",1.495119328792602
+1,HGB_var,"{'min_samples_leaf': 40, 'max_iter': 400, 'max_depth': 4, 'learning_rate': 0.05, 'l2_regularization': 10}",2.697688652411859
+1,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 400, 'max_depth': 3, 'learning_rate': 0.1, 'l2_regularization': 1}",2.6946275342217185
+1,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 100, 'max_depth': 3, 'learning_rate': 0.02, 'l2_regularization': 0}",1.8250245356438901
+1,HGB_var,"{'min_samples_leaf': 40, 'max_iter': 200, 'max_depth': 2, 'learning_rate': 0.05, 'l2_regularization': 1}",2.378741763606033
+1,RL_nivel,{'_': 0},5.792864316552244
+2,Ridge_var,{'alpha': 1},9.398917539645444
+2,Ridge_var,{'alpha': 10},7.316312286414035
+2,Ridge_var,{'alpha': 30},6.371262062902641
+2,Ridge_var,{'alpha': 100},5.440080040627348
+2,Ridge_var,{'alpha': 300},4.426812936309471
+2,Ridge_var,{'alpha': 1000},3.279254015214839
+2,Ridge_var,{'alpha': 3000},3.922925447348309
+2,RF_var,"{'min_samples_leaf': 20, 'max_features': 1.0, 'max_depth': None}",2.613989616741373
+2,RF_var,"{'min_samples_leaf': 5, 'max_features': 0.3, 'max_depth': 5}",3.051357559518897
+2,RF_var,"{'min_samples_leaf': 10, 'max_features': 0.3, 'max_depth': None}",2.1777094541527786
+2,RF_var,"{'min_samples_leaf': 10, 'max_features': 0.5, 'max_depth': None}",2.0052143258136232
+2,RF_var,"{'min_samples_leaf': 3, 'max_features': 0.5, 'max_depth': 5}",3.293322401396916
+2,RF_var,"{'min_samples_leaf': 20, 'max_features': 0.5, 'max_depth': None}",2.1620205782688195
+2,RF_var,"{'min_samples_leaf': 5, 'max_features': 1.0, 'max_depth': 5}",3.4178831966240275
+2,RF_var,"{'min_samples_leaf': 3, 'max_features': 0.3, 'max_depth': 5}",3.079157686534611
+2,RF_var,"{'min_samples_leaf': 3, 'max_features': 1.0, 'max_depth': 3}",3.596118737606913
+2,RF_var,"{'min_samples_leaf': 5, 'max_features': 0.5, 'max_depth': 5}",3.051573648933252
+2,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 400, 'max_depth': 4, 'learning_rate': 0.02, 'l2_regularization': 0}",4.339487934387385
+2,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 400, 'max_depth': 2, 'learning_rate': 0.02, 'l2_regularization': 0}",2.4742764954725796
+2,HGB_var,"{'min_samples_leaf': 40, 'max_iter': 400, 'max_depth': 3, 'learning_rate': 0.1, 'l2_regularization': 1}",10.508910119688677
+2,HGB_var,"{'min_samples_leaf': 20, 'max_iter': 400, 'max_depth': 3, 'learning_rate': 0.1, 'l2_regularization': 10}",6.139679640888054
+2,HGB_var,"{'min_samples_leaf': 20, 'max_iter': 200, 'max_depth': 4, 'learning_rate': 0.1, 'l2_regularization': 10}",4.290981658624135
+2,HGB_var,"{'min_samples_leaf': 20, 'max_iter': 200, 'max_depth': 3, 'learning_rate': 0.02, 'l2_regularization': 10}",2.959183692399884
+2,HGB_var,"{'min_samples_leaf': 40, 'max_iter': 400, 'max_depth': 4, 'learning_rate': 0.05, 'l2_regularization': 10}",8.129246788320144
+2,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 400, 'max_depth': 3, 'learning_rate': 0.1, 'l2_regularization': 1}",7.058393215914461
+2,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 100, 'max_depth': 3, 'learning_rate': 0.02, 'l2_regularization': 0}",3.184939314958468
+2,HGB_var,"{'min_samples_leaf': 40, 'max_iter': 200, 'max_depth': 2, 'learning_rate': 0.05, 'l2_regularization': 1}",6.03291662110968
+2,RL_nivel,{'_': 0},8.701560860174125
+4,Ridge_var,{'alpha': 1},8.491027749656494
+4,Ridge_var,{'alpha': 10},7.619140761218975
+4,Ridge_var,{'alpha': 30},6.294239258837955
+4,Ridge_var,{'alpha': 100},4.916288059816364
+4,Ridge_var,{'alpha': 300},4.217914592830432
+4,Ridge_var,{'alpha': 1000},3.9399301831931504
+4,Ridge_var,{'alpha': 3000},5.128432185914828
+4,RF_var,"{'min_samples_leaf': 20, 'max_features': 1.0, 'max_depth': None}",3.794029171453174
+4,RF_var,"{'min_samples_leaf': 5, 'max_features': 0.3, 'max_depth': 5}",3.3825866897646457
+4,RF_var,"{'min_samples_leaf': 10, 'max_features': 0.3, 'max_depth': None}",2.501819771842375
+4,RF_var,"{'min_samples_leaf': 10, 'max_features': 0.5, 'max_depth': None}",2.5327178091563494
+4,RF_var,"{'min_samples_leaf': 3, 'max_features': 0.5, 'max_depth': 5}",3.627970568489591
+4,RF_var,"{'min_samples_leaf': 20, 'max_features': 0.5, 'max_depth': None}",3.260074284597444
+4,RF_var,"{'min_samples_leaf': 5, 'max_features': 1.0, 'max_depth': 5}",3.4478412362362687
+4,RF_var,"{'min_samples_leaf': 3, 'max_features': 0.3, 'max_depth': 5}",3.5092735483334625
+4,RF_var,"{'min_samples_leaf': 3, 'max_features': 1.0, 'max_depth': 3}",4.486070194692911
+4,RF_var,"{'min_samples_leaf': 5, 'max_features': 0.5, 'max_depth': 5}",3.3402296414683126
+4,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 400, 'max_depth': 4, 'learning_rate': 0.02, 'l2_regularization': 0}",4.523081369011839
+4,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 400, 'max_depth': 2, 'learning_rate': 0.02, 'l2_regularization': 0}",3.3252782584331357
+4,HGB_var,"{'min_samples_leaf': 40, 'max_iter': 400, 'max_depth': 3, 'learning_rate': 0.1, 'l2_regularization': 1}",6.421237467820501
+4,HGB_var,"{'min_samples_leaf': 20, 'max_iter': 400, 'max_depth': 3, 'learning_rate': 0.1, 'l2_regularization': 10}",5.026414012117151
+4,HGB_var,"{'min_samples_leaf': 20, 'max_iter': 200, 'max_depth': 4, 'learning_rate': 0.1, 'l2_regularization': 10}",5.135703397308885
+4,HGB_var,"{'min_samples_leaf': 20, 'max_iter': 200, 'max_depth': 3, 'learning_rate': 0.02, 'l2_regularization': 10}",2.678357848484099
+4,HGB_var,"{'min_samples_leaf': 40, 'max_iter': 400, 'max_depth': 4, 'learning_rate': 0.05, 'l2_regularization': 10}",5.320503077721016
+4,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 400, 'max_depth': 3, 'learning_rate': 0.1, 'l2_regularization': 1}",4.058856827537912
+4,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 100, 'max_depth': 3, 'learning_rate': 0.02, 'l2_regularization': 0}",5.323653065487555
+4,HGB_var,"{'min_samples_leaf': 40, 'max_iter': 200, 'max_depth': 2, 'learning_rate': 0.05, 'l2_regularization': 1}",4.256619128566862
+4,RL_nivel,{'_': 0},6.962588967310971
+8,Ridge_var,{'alpha': 1},8.635731774888407
+8,Ridge_var,{'alpha': 10},7.7647149446968635
+8,Ridge_var,{'alpha': 30},6.290109580468204
+8,Ridge_var,{'alpha': 100},5.123700295631541
+8,Ridge_var,{'alpha': 300},5.300478237321827
+8,Ridge_var,{'alpha': 1000},6.2918384112731855
+8,Ridge_var,{'alpha': 3000},7.30346734070978
+8,RF_var,"{'min_samples_leaf': 20, 'max_features': 1.0, 'max_depth': None}",4.484944741944699
+8,RF_var,"{'min_samples_leaf': 5, 'max_features': 0.3, 'max_depth': 5}",4.499666213485111
+8,RF_var,"{'min_samples_leaf': 10, 'max_features': 0.3, 'max_depth': None}",3.910129161964687
+8,RF_var,"{'min_samples_leaf': 10, 'max_features': 0.5, 'max_depth': None}",4.146183377373673
+8,RF_var,"{'min_samples_leaf': 3, 'max_features': 0.5, 'max_depth': 5}",4.357996187004129
+8,RF_var,"{'min_samples_leaf': 20, 'max_features': 0.5, 'max_depth': None}",4.48821460774528
+8,RF_var,"{'min_samples_leaf': 5, 'max_features': 1.0, 'max_depth': 5}",3.7899879452642202
+8,RF_var,"{'min_samples_leaf': 3, 'max_features': 0.3, 'max_depth': 5}",4.527567729699037
+8,RF_var,"{'min_samples_leaf': 3, 'max_features': 1.0, 'max_depth': 3}",6.218270196239485
+8,RF_var,"{'min_samples_leaf': 5, 'max_features': 0.5, 'max_depth': 5}",4.037382086463418
+8,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 400, 'max_depth': 4, 'learning_rate': 0.02, 'l2_regularization': 0}",5.438928225579867
+8,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 400, 'max_depth': 2, 'learning_rate': 0.02, 'l2_regularization': 0}",5.968886224354779
+8,HGB_var,"{'min_samples_leaf': 40, 'max_iter': 400, 'max_depth': 3, 'learning_rate': 0.1, 'l2_regularization': 1}",6.978629040558533
+8,HGB_var,"{'min_samples_leaf': 20, 'max_iter': 400, 'max_depth': 3, 'learning_rate': 0.1, 'l2_regularization': 10}",7.471025256331809
+8,HGB_var,"{'min_samples_leaf': 20, 'max_iter': 200, 'max_depth': 4, 'learning_rate': 0.1, 'l2_regularization': 10}",5.726406375864156
+8,HGB_var,"{'min_samples_leaf': 20, 'max_iter': 200, 'max_depth': 3, 'learning_rate': 0.02, 'l2_regularization': 10}",5.525281572438821
+8,HGB_var,"{'min_samples_leaf': 40, 'max_iter': 400, 'max_depth': 4, 'learning_rate': 0.05, 'l2_regularization': 10}",6.122703944380514
+8,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 400, 'max_depth': 3, 'learning_rate': 0.1, 'l2_regularization': 1}",8.098315335864827
+8,HGB_var,"{'min_samples_leaf': 10, 'max_iter': 100, 'max_depth': 3, 'learning_rate': 0.02, 'l2_regularization': 0}",4.877055206283104
+8,HGB_var,"{'min_samples_leaf': 40, 'max_iter': 200, 'max_depth': 2, 'learning_rate': 0.05, 'l2_regularization': 1}",5.717141979391147
+8,RL_nivel,{'_': 0},6.128100510700087

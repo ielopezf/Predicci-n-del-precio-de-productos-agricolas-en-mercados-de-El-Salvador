@@ -24,6 +24,7 @@ Informáticos. Ciclo I 2026. **Grupo 01.** Docente: Ing. Bladimir Díaz Campos.
 7. [Flujo CRISP-DM y cobertura de la rúbrica](#7-flujo-crisp-dm-y-cobertura-de-la-rúbrica)
 8. [Solución de problemas](#8-solución-de-problemas)
 9. [Despliegue: API + Streamlit](#9-despliegue-api--streamlit)
+10. [Etapa final: reproducir los resultados de modelado](#10-etapa-final-reproducir-los-resultados-de-modelado)
 
 ---
 
@@ -91,6 +92,7 @@ ubicados así (algunos vienen incluidos en el repositorio):
 | `precipitaciones_el_salvador_2021-2024.xlsx` | `data/external/` | Registros de precipitación diaria |
 | `ipc_transporte.csv` | `data/external/` | BCR — IPC partición 1.7 Transporte |
 | `Produccion.csv` | `data/external/` | FAOSTAT — producción agrícola anual |
+| `lluvia_mensual_sv.xlsx` | `data/external/` | Lluvia mensual (opcional: solo la usan la auditoría y la prueba a10) |
 
 > Si `data/interim/precios_consolidados.xlsx` no existe, genéralo primero a partir de
 > los informes diarios del MAG con el script `Extraer datos/extraer_precios.py`
@@ -148,13 +150,16 @@ prediccion_precios_agricolas/
 │   ├── 03_modelos_baseline.ipynb
 │   └── 04_modelos_avanzados.ipynb
 ├── src/prediccion_precios/     # paquete Python con toda la lógica
+├── scripts/                    # análisis de la etapa final (a1…a11) y run_all.py — ver sección 10
+├── tests/                      # pruebas automáticas (pytest)
 ├── models/                     # modelos entrenados (.pkl / .keras) — generados
 ├── api/                        # API Flask de despliegue (sirve los modelos) — ver sección 9
 ├── streamlit_app/              # prototipo Streamlit (consume la API) — ver sección 9
 ├── reports/
 │   ├── figures/                # figuras del EDA y resultados — generadas
 │   ├── etapa1/                 # documento de resultados de la Etapa 1
-│   └── etapa2/                 # tabla comparativa, hiperparámetros, reporte de equidad — generados
+│   ├── etapa2/                 # tabla comparativa, hiperparámetros, reporte de equidad — generados
+│   └── etapa3/                 # resultados de la etapa final (CSV) — generados por scripts/
 ├── references/                 # papers y documentación consultada
 ├── requirements.txt
 ├── RECURSOS.md                 # recursos del proyecto completo
@@ -176,6 +181,9 @@ prediccion_precios_agricolas/
 | `evaluation.py` | Métricas MAE/RMSE/MAPE/R², split temporal (2 y 3 tramos), validación cruzada temporal, tabla comparativa |
 | `interpretability.py` | Importancia de variables, SHAP y LIME |
 | `fairness.py` | Evaluación ética y de sesgos: métricas por producto/temporada, brecha de equidad, limitaciones — Etapa 2 |
+| `baselines_ingenuos.py` | Persistencia, media móvil, estacional, deriva, ETS amortiguado y ARIMA(p,1,0) (NumPy/SciPy) — etapa final |
+| `auditoria_datos.py` | Auditoría de calidad: nulos, repeticiones de precio, recortes y cobertura de fuentes — etapa final |
+| `pipeline_causal.py` | Dataset semanal causal: `precio_imputado`, `n_dias`, `semanas_sin_cambio`, sin interpolar hacia el futuro — etapa final |
 
 Las dependencias pesadas (scikit-learn, xgboost, shap, lime, optuna, tensorflow) se
 importan de forma diferida, por lo que el paquete se importa sin error aunque falten;
@@ -250,7 +258,70 @@ streamlit run app.py                # abre http://localhost:8501
 Por defecto Streamlit apunta a `http://localhost:5000`; para usar otra URL de API,
 define la variable de entorno `API_URL` antes de ejecutar `streamlit run`.
 
+## 10. Etapa final: reproducir los resultados de modelado
+
+La etapa final revisa el tratamiento de datos y compara los modelos con una evaluación
+equivalente (misma división temporal, mismas variables y mismo presupuesto de afinación).
+Todos los resultados se generan como CSV en `reports/etapa3/` con un solo comando.
+
+```bash
+# Con el entorno virtual activo y desde la raíz del repositorio
+python scripts/run_all.py                              # usa data/interim/precios_consolidados.xlsx
+python scripts/run_all.py --precios RUTA/al/excel.xlsx # si el archivo está en otra ubicación
+python scripts/run_all.py --con-lstm                   # incluye el LSTM (requiere tensorflow; lento)
+python scripts/run_all.py --solo a4,a6                 # solo algunos pasos
+```
+
+`run_all.py` corre primero las pruebas (`pytest`) y después cada paso en orden; se
+detiene al primer error e indica cómo reanudar con `--solo`. Requiere
+`data/processed/dataset_modelado.csv` y el Excel de precios. Si falta
+`data/external/lluvia_mensual_sv.xlsx`, omite el paso a10.
+
+| Clave | Script | Qué hace | Salidas principales en `reports/etapa3/` |
+|---|---|---|---|
+| a1 | `a1_baselines.py` | Referencias ingenuas, ETS y ARIMA sobre las 157 filas de prueba | `metricas_baselines.csv` |
+| a2 | `a2_auditoria.py` | Auditoría de datos y cobertura de fuentes | `auditoria_precios.csv`, `cobertura_fuentes.csv`, `semanas_sin_dato.csv` |
+| a9 | `a9_sensibilidad_nulos.py` | Sensibilidad al tratamiento de nulos y valores atípicos | `sensibilidad_nulos.csv` |
+| a4 | `a4_horizontes.py` | Horizontes de 1, 2, 4 y 8 semanas con origen móvil | `horizontes_resumen.csv` |
+| a6 | `a6_afinacion.py` | Afinación equivalente de todos los modelos | `tabla_por_producto.csv`, `afinacion_cv.csv` |
+| a7 | `a7_ensamble.py` | Ensamble contraído hacia la persistencia (necesita a6) | `ensamble_resumen.csv` |
+| a8 | `a8_inferencia.py` | Diebold-Mariano e intervalos de predicción (necesita a6 y a7) | `diebold_mariano.csv`, `intervalos_persistencia.csv` |
+| a10 | `a10_prueba_lluvia_mensual.py` | ¿Aporta la lluvia mensual? (necesita a6) | `prueba_lluvia_mensual.csv` |
+| a11 | `a11_lstm.py` | LSTM con el mismo protocolo (opcional; usa funciones de a6 pero no sus resultados) | `lstm_resumen.csv` |
+
+**Resultados principales** (prueba: 26-nov-2023 a 30-jun-2024; periodo de datos: mayo de 2021 a junio de 2024):
+
+- La persistencia (el precio de la semana pasada) es la mejor referencia: MAPE global de
+  4.49 % a una semana y 16.24 % a ocho.
+- Con afinación equivalente, regresión lineal, Ridge, Random Forest y Gradient Boosting no la
+  superan de forma consistente; la prueba de Diebold-Mariano los da como significativamente peores.
+- Cambiar el tratamiento de nulos y valores atípicos modifica el MAPE global en menos de 0.6 puntos.
+- El error depende del producto: el arroz es casi constante; el tomate tiene un cambio semanal medio de 15 %.
+- Ni la lluvia diaria ni la mensual mejoran los pronósticos.
+
+**Nota sobre el LSTM.** `a11_lstm.py` necesita `tensorflow` o `keras` (están en
+`requirements.txt`). Con `--stub` solo comprueba el flujo de datos con una regresión Ridge,
+sin red neuronal; esos resultados **no** son del LSTM.
+
+**Pruebas automáticas:** `python -m pytest tests/test_baselines.py`.
+
+**Limitaciones:** los precios llegan a junio de 2024 y no se encontraron fuentes más recientes;
+la prueba tiene 28 semanas por producto; los precios de la naranja se repiten en el 87 % de los
+días. Los notebooks 03 y 04 conservan los resultados de la Etapa 2, que no son comparables con
+las tablas de esta sección.
+
 ---
 
 *Proyecto académico. Datos de fuentes públicas oficiales de El Salvador (MAG, BCR,
 DIGESTYC, DGEHM) y FAOSTAT.*
+
+
+## 11. Aplicación: pronóstico a 1–4 semanas
+
+- **Módulo**: `src/prediccion_precios/pronostico.py` (funciones puras, probadas en `tests/test_pronostico.py`).
+- **Método**: persistencia (último precio) + intervalos empíricos 80/90 % + semáforo de confiabilidad por producto y horizonte + avisos (tomate, meses de cosecha, dato viejo). Es lo que respalda el informe: ningún modelo supera a la persistencia de forma robusta.
+- **Exportar**: `python scripts/a12_pronostico.py [--mag reporte.csv]` → `reports/pronostico.csv`.
+- **Streamlit**: `streamlit run streamlit_app/app.py` → vista "Pronóstico (1–4 semanas)"; permite cargar precio manual o un CSV/XLSX con columnas `Fecha, Producto, Precio`.
+- **API**: `GET /api/pronostico[?producto=TOMATE&precio=30&fecha_base=2025-01-05]`.
+- **Limitación**: los datos terminan en junio de 2024; sin precio vigente la app avisa que el pronóstico corresponde a esa fecha. Los intervalos cubrieron 63 % (nominal 80 %) y 73 % (nominal 90 %) en la prueba.
+- **CI**: `.github/workflows/tests.yml` corre pytest en cada push.
