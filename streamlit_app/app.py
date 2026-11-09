@@ -97,9 +97,8 @@ def api_get_opcional(ruta, params=None):
 
 st.title("Predicción de precios agrícolas — El Salvador")
 
-vista = st.sidebar.radio("Vista", ["Pronóstico (1–4 semanas)", "Backtest y comparación de modelos"])
 
-if vista.startswith("Pronóstico"):
+def vista_pronostico():
     sys.path.insert(0, str(ROOT_DIR / "src"))
     from prediccion_precios import pronostico as pr
 
@@ -121,7 +120,7 @@ if vista.startswith("Pronóstico"):
     )
 
     grupos = sorted(hist["Grupo"].unique())
-    with st.sidebar.expander("Precio vigente (opcional)"):
+    with st.expander("Precio vigente (opcional)"):
         archivo = st.file_uploader("Reporte MAG (CSV/XLSX: Fecha, Producto, Precio)", type=["csv", "xlsx"])
         manual = {}
         for g in grupos:
@@ -144,7 +143,7 @@ if vista.startswith("Pronóstico"):
     h_sel = st.slider("Horizonte (semanas)", 1, 4, 1)
     if not sel:
         st.info("Seleccione al menos un producto.")
-        st.stop()
+        return
     tabla = pr.pronosticar_todos(hist, precios, fecha_base)
     tabla = tabla[tabla["grupo"].isin(sel)]
     icono = {"verde": "🟢", "amarillo": "🟡", "rojo": "🔴", "gris": "⚪"}
@@ -164,96 +163,105 @@ if vista.startswith("Pronóstico"):
         st.download_button("Descargar CSV", tabla.to_csv(index=False).encode("utf-8"), "pronostico.csv", "text/csv")
     st.caption("Semáforo: verde = error de prueba < 5 %, amarillo = 5–15 % (meta del proyecto), rojo = > 15 %. "
                "Describe el desempeño pasado, no garantiza el futuro.")
-    st.stop()
 
-st.caption(
-    "Backtest histórico: precio real vs. predicho sobre el tramo de test que el modelo "
-    "nunca vio al entrenarse. **No es un pronóstico del futuro** — no hay valores reales "
-    "futuros de combustible, IPC o clima con los que alimentar al modelo."
-)
 
-try:
-    productos_disp = api_get("/api/productos")
-    modelos_disp = [m for m in api_get("/api/modelos") if m["disponible"]]
-except requests.exceptions.RequestException as e:
-    st.error(f"No se pudo conectar con la API configurada ({API_URL}).\n\n{e}")
-    st.stop()
-except Exception as e:
-    st.error(
-        "No se pudieron cargar los datos/modelos del prototipo. Verifica que "
-        "`data/processed/dataset_modelado.csv` y los archivos de `models/` estén "
-        f"versionados en el repositorio.\n\nDetalle: {e}"
+def vista_backtest():
+    st.sidebar.caption("Controles de la pestaña Backtest y comparación de modelos")
+    st.caption(
+        "Backtest histórico: precio real vs. predicho sobre el tramo de test que el modelo "
+        "nunca vio al entrenarse. **No es un pronóstico del futuro** — no hay valores reales "
+        "futuros de combustible, IPC o clima con los que alimentar al modelo."
     )
-    st.stop()
 
-if not modelos_disp:
-    st.warning("Todavía no hay modelos entrenados disponibles en `models/`.")
-    st.stop()
+    try:
+        productos_disp = api_get("/api/productos")
+        modelos_disp = [m for m in api_get("/api/modelos") if m["disponible"]]
+    except requests.exceptions.RequestException as e:
+        st.error(f"No se pudo conectar con la API configurada ({API_URL}).\n\n{e}")
+        return
+    except Exception as e:
+        st.error(
+            "No se pudieron cargar los datos/modelos del prototipo. Verifica que "
+            "`data/processed/dataset_modelado.csv` y los archivos de `models/` estén "
+            f"versionados en el repositorio.\n\nDetalle: {e}"
+        )
+        return
 
-# --------------------------------------------------------------------------- #
-# Barra lateral: selección de productos y modelo
-# --------------------------------------------------------------------------- #
-st.sidebar.header("Selección")
-nombres_producto = [p["producto"] for p in productos_disp]
-slug_por_producto = {p["producto"]: p["slug"] for p in productos_disp}
+    if not modelos_disp:
+        st.warning("Todavía no hay modelos entrenados disponibles en `models/`.")
+        return
 
-productos_sel = st.sidebar.multiselect("Producto(s)", nombres_producto, default=nombres_producto[:2])
-nombres_modelo = [m["nombre"] for m in modelos_disp]
-etiquetas_modelo = {m["nombre"]: f"{m['nombre']} ({m['tipo']})" for m in modelos_disp}
-modelo_sel = st.sidebar.selectbox("Modelo", nombres_modelo, format_func=lambda n: etiquetas_modelo[n])
+    # --------------------------------------------------------------------------- #
+    # Barra lateral: selección de productos y modelo
+    # --------------------------------------------------------------------------- #
+    st.sidebar.header("Selección")
+    nombres_producto = [p["producto"] for p in productos_disp]
+    slug_por_producto = {p["producto"]: p["slug"] for p in productos_disp}
 
-if not productos_sel:
-    st.info("Selecciona al menos un producto en la barra lateral.")
-    st.stop()
+    productos_sel = st.sidebar.multiselect("Producto(s)", nombres_producto, default=nombres_producto[:2])
+    nombres_modelo = [m["nombre"] for m in modelos_disp]
+    etiquetas_modelo = {m["nombre"]: f"{m['nombre']} ({m['tipo']})" for m in modelos_disp}
+    modelo_sel = st.sidebar.selectbox("Modelo", nombres_modelo, format_func=lambda n: etiquetas_modelo[n])
 
-slugs_sel = ",".join(slug_por_producto[p] for p in productos_sel)
+    if not productos_sel:
+        st.info("Selecciona al menos un producto en la barra lateral.")
+        return
 
-# --------------------------------------------------------------------------- #
-# Métricas globales del modelo
-# --------------------------------------------------------------------------- #
-metricas = api_get("/api/metricas", {"modelo": modelo_sel})
-st.subheader(f"Métricas del modelo — {modelo_sel}")
-cols = st.columns(4)
-for col, (k, v) in zip(cols, metricas["globales"].items()):
-    col.metric(k, v)
+    slugs_sel = ",".join(slug_por_producto[p] for p in productos_sel)
 
-with st.expander("Métricas por producto"):
-    st.dataframe(pd.DataFrame(metricas["por_producto"]), width="stretch")
-if metricas["por_temporada"]:
-    with st.expander("Métricas cosecha vs. no cosecha"):
-        st.dataframe(pd.DataFrame(metricas["por_temporada"]), width="stretch")
+    # --------------------------------------------------------------------------- #
+    # Métricas globales del modelo
+    # --------------------------------------------------------------------------- #
+    metricas = api_get("/api/metricas", {"modelo": modelo_sel})
+    st.subheader(f"Métricas del modelo — {modelo_sel}")
+    cols = st.columns(4)
+    for col, (k, v) in zip(cols, metricas["globales"].items()):
+        col.metric(k, v)
 
-# --------------------------------------------------------------------------- #
-# Series real vs. predicho, por producto
-# --------------------------------------------------------------------------- #
-st.subheader("Precio real vs. predicho (test histórico)")
-pred = pd.DataFrame(api_get("/api/prediccion", {"modelo": modelo_sel, "productos": slugs_sel}))
-if pred.empty:
-    st.warning("Sin datos de predicción para esa combinación de producto/modelo.")
-else:
-    pred["Fecha"] = pd.to_datetime(pred["Fecha"])
-    for producto in productos_sel:
-        sub = pred[pred["Producto"] == producto].set_index("Fecha")[["precio_real", "precio_predicho"]]
-        if sub.empty:
-            continue
-        st.markdown(f"**{producto}**")
-        st.line_chart(sub)
+    with st.expander("Métricas por producto"):
+        st.dataframe(pd.DataFrame(metricas["por_producto"]), width="stretch")
+    if metricas["por_temporada"]:
+        with st.expander("Métricas cosecha vs. no cosecha"):
+            st.dataframe(pd.DataFrame(metricas["por_temporada"]), width="stretch")
 
-# --------------------------------------------------------------------------- #
-# Importancia de variables (si el modelo la soporta)
-# --------------------------------------------------------------------------- #
-importancia = api_get_opcional("/api/importancia", {"modelo": modelo_sel, "top": 15})
-if isinstance(importancia, list):
-    st.subheader("Importancia de variables")
-    df_imp = pd.DataFrame(importancia).set_index("feature")
-    st.bar_chart(df_imp["importancia"])
+    # --------------------------------------------------------------------------- #
+    # Series real vs. predicho, por producto
+    # --------------------------------------------------------------------------- #
+    st.subheader("Precio real vs. predicho (test histórico)")
+    pred = pd.DataFrame(api_get("/api/prediccion", {"modelo": modelo_sel, "productos": slugs_sel}))
+    if pred.empty:
+        st.warning("Sin datos de predicción para esa combinación de producto/modelo.")
+    else:
+        pred["Fecha"] = pd.to_datetime(pred["Fecha"])
+        for producto in productos_sel:
+            sub = pred[pred["Producto"] == producto].set_index("Fecha")[["precio_real", "precio_predicho"]]
+            if sub.empty:
+                continue
+            st.markdown(f"**{producto}**")
+            st.line_chart(sub)
 
-# --------------------------------------------------------------------------- #
-# Evaluación ética y de sesgos
-# --------------------------------------------------------------------------- #
-st.subheader("Evaluación ética y de sesgos")
-equidad = api_get("/api/equidad", {"modelo": modelo_sel})
-st.dataframe(pd.DataFrame(equidad["por_producto"]), width="stretch")
-if equidad["reporte"]:
-    with st.expander("Limitaciones y consideraciones éticas", expanded=False):
-        st.text(equidad["reporte"])
+    # --------------------------------------------------------------------------- #
+    # Importancia de variables (si el modelo la soporta)
+    # --------------------------------------------------------------------------- #
+    importancia = api_get_opcional("/api/importancia", {"modelo": modelo_sel, "top": 15})
+    if isinstance(importancia, list):
+        st.subheader("Importancia de variables")
+        df_imp = pd.DataFrame(importancia).set_index("feature")
+        st.bar_chart(df_imp["importancia"])
+
+    # --------------------------------------------------------------------------- #
+    # Evaluación ética y de sesgos
+    # --------------------------------------------------------------------------- #
+    st.subheader("Evaluación ética y de sesgos")
+    equidad = api_get("/api/equidad", {"modelo": modelo_sel})
+    st.dataframe(pd.DataFrame(equidad["por_producto"]), width="stretch")
+    if equidad["reporte"]:
+        with st.expander("Limitaciones y consideraciones éticas", expanded=False):
+            st.text(equidad["reporte"])
+
+
+tab_back, tab_pron = st.tabs(["Backtest y comparación de modelos", "Pronóstico (1–4 semanas)"])
+with tab_back:
+    vista_backtest()
+with tab_pron:
+    vista_pronostico()
