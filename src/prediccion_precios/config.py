@@ -80,7 +80,9 @@ PRODUCTO_A_ITEM_PRODUCCION = {
 # Preparación de datos
 # --------------------------------------------------------------------------- #
 FRECUENCIA = "W"                      # frecuencia común (semanal) para alinear fuentes
-DATASET_MODELADO = PROCESSED_DIR / "dataset_modelado.csv"
+DATASET_MODELADO = PROCESSED_DIR / "dataset_modelado.csv"          # Etapa 2 (interpolado, con recorte IQR)
+DATASET_CAUSAL = PROCESSED_DIR / "dataset_modelado_causal.csv"      # Etapa final (sin interpolar, sin recorte; ffill)
+FLAGS_CAUSAL = PROCESSED_DIR / "dataset_causal_flags.csv"           # precio_imputado, n_dias, semanas_sin_cambio
 
 # Meses de cosecha por cultivo en El Salvador (aporte local; ver perfil, calendario
 # agrícola: primera, postrera y apante). Usado para la bandera `es_cosecha`.

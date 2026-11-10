@@ -179,7 +179,8 @@ def vista_pronostico():
 
 def vista_backtest():
     st.caption(
-        "Backtest histórico: precio real vs. predicho sobre el tramo de test que el modelo "
+        "Backtest histórico (modelos reentrenados con el tratamiento causal de datos: sin interpolar ni recortar picos): "
+    "precio real vs. predicho sobre el tramo de test que el modelo "
         "nunca vio al entrenarse. **No es un pronóstico del futuro** — no hay valores reales "
         "futuros de combustible, IPC o clima con los que alimentar al modelo."
     )

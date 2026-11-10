@@ -7,6 +7,8 @@ data/external/*
 
 # Dataset necesario para la aplicación desplegada
 !data/processed/dataset_modelado.csv
+!data/processed/dataset_modelado_causal.csv
+!data/processed/dataset_causal_flags.csv
 
 
 # --- Modelos serializados ---
@@ -46,3 +48,6 @@ mlruns/
 reports/etapa3/*_stub.csv
 .agents/
 .claude/
+
+# Respaldo local de los modelos de la Etapa 2
+models_etapa2/

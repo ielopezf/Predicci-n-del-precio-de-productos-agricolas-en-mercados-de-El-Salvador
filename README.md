@@ -344,3 +344,15 @@ Instalar: `pip install -r requirements-extraccion.txt` (Selenium requiere Chrome
 | `scripts/extraccion/agregar_fechas_faltantes.py` | — | completa días sin precio de una serie (`ENTRADA SALIDA --producto`) |
 
 Nota: en el extractor de combustibles, un valor vacío en la fuente se guarda como `0.0` (no como nulo). Eso explica los ceros de diésel que reporta la auditoría; los modelos los reciben tal cual vienen en `data/external/`.
+
+## 13. Reentrenar los modelos con el tratamiento causal de datos
+
+`scripts/a13_reentrenar_modelos.py` reentrena los siete modelos de la Etapa 2 (regresión lineal, Random Forest, XGBoost, XGBoost optimizado, red neuronal, LSTM y ensamble por stacking) con el mismo código de los notebooks 03 y 04, pero sobre `data/processed/dataset_modelado_causal.csv`: sin recorte IQR global y sin interpolación; la semana sin cotización conserva el último precio vigente (*forward fill*).
+
+```
+python scripts/a13_reentrenar_modelos.py --precios data/interim/precios_consolidados.xlsx
+```
+
+- Respalda `models/` en `models_etapa2/` (ignorada por Git) antes de sobrescribir.
+- Escribe `reports/etapa3/reentrenamiento_tabla.csv`: MAPE de la Etapa 2 frente al causal, la persistencia como referencia y el MAPE solo en semanas con precio publicado.
+- Después, la API y la app usan automáticamente el dataset causal y los modelos nuevos. Hay que subir `models/` y `data/processed/dataset_modelado_causal.csv` juntos.

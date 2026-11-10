@@ -43,7 +43,10 @@ def slugify(texto: str) -> str:
 # --------------------------------------------------------------------------- #
 # Datos: dataset limpio (sin NaN) + tramo de test, alineado con Fecha/Producto
 # --------------------------------------------------------------------------- #
-_data = pd.read_csv(config.DATASET_MODELADO, parse_dates=[config.COL_FECHA])
+# Dataset causal (Etapa final: sin interpolar, sin recorte IQR, ffill) si existe; si no, el de la Etapa 2.
+# Debe coincidir con el dataset con el que se entrenaron los modelos de models/ (scripts/a13_reentrenar_modelos.py).
+RUTA_DATOS = config.DATASET_CAUSAL if config.DATASET_CAUSAL.exists() else config.DATASET_MODELADO
+_data = pd.read_csv(RUTA_DATOS, parse_dates=[config.COL_FECHA])
 
 # X, y y los metadatos se obtienen de UNA MISMA copia ya ordenada y filtrada.
 # Es importante no ordenar _meta por separado: cuando varios productos comparten

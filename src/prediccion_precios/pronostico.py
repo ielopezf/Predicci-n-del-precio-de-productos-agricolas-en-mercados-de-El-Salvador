@@ -37,7 +37,9 @@ def _sin_tildes(s: str) -> str:
 
 def cargar_historia(ruta: str | Path | None = None) -> pd.DataFrame:
     """Serie semanal por producto: columnas Fecha, Grupo, Producto, Precio (ordenada)."""
-    d = pd.read_csv(ruta or config.DATASET_MODELADO, parse_dates=[config.COL_FECHA])
+    if ruta is None:   # preferir el dataset causal (sin interpolar ni recortar), coherente con el informe
+        ruta = config.DATASET_CAUSAL if config.DATASET_CAUSAL.exists() else config.DATASET_MODELADO
+    d = pd.read_csv(ruta, parse_dates=[config.COL_FECHA])
     d = d[[config.COL_FECHA, "Grupo", config.COL_PRODUCTO, config.COL_PRECIO]].dropna(subset=[config.COL_PRECIO])
     return d.sort_values(["Grupo", config.COL_FECHA]).reset_index(drop=True)
 

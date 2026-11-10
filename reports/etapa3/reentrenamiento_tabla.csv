@@ -1,0 +1,9 @@
+Modelo,MAE,RMSE,MAPE_%,R2,MAPE_%_solo_semanas_reales,MAPE_%_etapa2
+persistencia (último precio),1.1573,2.2328,4.5927,0.9944,4.9051,
+regresion_lineal,1.39,2.2858,5.3828,0.9941,5.606,5.9521
+lstm (tramo propio),1.4487,2.3317,5.8573,0.9939,,
+random_forest,1.8292,2.8239,6.4782,0.9911,6.6145,7.6405
+ensemble_stacking,1.6171,2.3999,6.6398,0.9936,6.7905,6.326
+xgboost_baseline,1.6745,2.608,6.7625,0.9924,6.7952,7.5865
+xgboost_optimizado,2.0829,3.2218,8.1128,0.9884,8.2168,7.6951
+red_neuronal,2.8163,3.8139,10.8536,0.9837,10.8965,15.872
