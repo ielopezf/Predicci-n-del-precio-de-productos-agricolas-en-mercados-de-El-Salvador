@@ -79,9 +79,11 @@ FECHAS_S_TEST, PRODUCTOS_S_TEST = fechas_s[-_ns_test:], productos_s[-_ns_test:]
 # Carga de modelos entrenados (tolera que alguno aún no exista)
 # --------------------------------------------------------------------------- #
 def _cargar(nombre, cargador):
+    """Devuelve el modelo o None si falta el archivo o la librería (p. ej. TensorFlow en el servidor:
+    la red neuronal y la LSTM quedan como 'no disponibles' y el resto de la API funciona)."""
     try:
         return cargador()
-    except FileNotFoundError:
+    except (FileNotFoundError, ImportError):
         return None
 
 
