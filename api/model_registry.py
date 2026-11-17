@@ -228,3 +228,10 @@ def equidad_modelo(nombre_modelo):
         "por_temporada": metricas["por_temporada"],
         "reporte": fa.reporte_texto(tabla_grupo, tabla_temp),
     }
+
+
+@functools.lru_cache(maxsize=1)
+def pronostico_siguiente():
+    """{grupo: {'regresion_lineal': USD|None, 'lstm': USD|None}} para la semana siguiente al último dato."""
+    from prediccion_precios import pronostico as pr
+    return pr.pronostico_modelos(_data, MODELOS)

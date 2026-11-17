@@ -319,13 +319,13 @@ las tablas de esta sección.
 DIGESTYC, DGEHM) y FAOSTAT.*
 
 
-## 11. Aplicación: pronóstico a 1–4 semanas
+## 11. Aplicación: pronóstico de la semana siguiente
 
 - **Módulo**: `src/prediccion_precios/pronostico.py` (funciones puras, probadas en `tests/test_pronostico.py`).
 - **Método**: persistencia (último precio) + intervalos empíricos 80/90 % + semáforo de confiabilidad por producto y horizonte + avisos (tomate, meses de cosecha, dato viejo). Es lo que respalda el informe: ningún modelo supera a la persistencia de forma robusta.
 - **Exportar**: `python scripts/a12_pronostico.py [--mag reporte.csv]` → `reports/pronostico.csv`.
 - **Aplicación publicada**: https://prediccionpreciosagricolassv.streamlit.app/ (QR: `python scripts/generar_qr.py`, requiere `pip install "qrcode[pil]"`).
-- **Streamlit (local)**: `streamlit run streamlit_app/app.py` → vista "Pronóstico (1–4 semanas)"; permite cargar precio manual o un CSV/XLSX con columnas `Fecha, Producto, Precio`.
+- **Streamlit (local)**: `streamlit run streamlit_app/app.py` → vista "Pronóstico (1 semana)": persistencia como referencia y, como alternativas, regresión lineal y LSTM (variables externas en su último valor conocido). La carga de precios vigentes (CSV/XLSX con columnas `Fecha, Producto, Precio`) está oculta (`MOSTRAR_CARGA_ARCHIVO = False` en `streamlit_app/app.py`).
 - **API**: `GET /api/pronostico[?producto=TOMATE&precio=30&fecha_base=2025-01-05]`.
 - **Limitación**: los datos terminan en junio de 2024; sin precio vigente la app avisa que el pronóstico corresponde a esa fecha. Los intervalos cubrieron 63 % (nominal 80 %) y 73 % (nominal 90 %) en la prueba.
 - **CI**: `.github/workflows/tests.yml` corre pytest en cada push.

@@ -1,4 +1,4 @@
-"""pronostico.py — Pronóstico a 1–4 semanas con intervalo empírico y semáforo de confiabilidad.
+"""pronostico.py — Pronóstico a 1 semana con intervalo empírico, semáforo de confiabilidad y modelos de ML.
 
 Qué hace (y qué NO hace):
 - Pronóstico puntual = persistencia (último precio observado). En la evaluación de la etapa final
@@ -10,6 +10,9 @@ Qué hace (y qué NO hace):
 - Semáforo = error de la persistencia en el tramo de prueba para ese horizonte, contra la meta
   MAPE < 15 % de `config`. Es una medida descriptiva del pasado, no una garantía a futuro.
 - Los datos terminan en junio de 2024: si el precio de partida es viejo, se avisa.
+- Alternativas de ML (regresión lineal, LSTM): `pronostico_modelos` arma la fila de la semana siguiente con las
+  MISMAS funciones de `features.py` y mantiene las variables externas (combustible, lluvia, IPC, producción) en su
+  último valor conocido, porque no existen valores futuros. Se muestran junto a la persistencia, que es la referencia.
 Funciones puras (sin Streamlit/Flask) para poder probarlas con pytest.
 """
 from __future__ import annotations
@@ -21,9 +24,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import config
+from . import config, features as ft
 
-HORIZONTES = (1, 2, 3, 4)
+HORIZONTES = (1,)     # el sistema solo pronostica la semana siguiente
 NIVELES = (0.80, 0.90)
 FIN_CALIBRACION = pd.Timestamp("2023-11-26")    # = INI_TEST de scripts/a4_horizontes.py
 UMBRAL_VERDE, UMBRAL_AMARILLO = 5.0, config.META_MAPE_OBJETIVO * 100   # % de MAPE
@@ -218,4 +221,82 @@ def leer_reporte_mag(archivo, historia: pd.DataFrame | None = None) -> dict:
         out[g] = (f, p)
     if not out:
         raise ValueError("No se reconoció ningún producto (el nombre debe contener ARROZ, FRIJOL, MAÍZ, NARANJA o TOMATE).")
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# Pronóstico de la semana siguiente con modelos de ML entrenados
+# --------------------------------------------------------------------------- #
+MODELOS_PRONOSTICO = ("regresion_lineal", "lstm")
+VENTANA_LSTM = 8
+
+
+def _precios_producto(dataset: pd.DataFrame, grupo: str) -> pd.DataFrame:
+    d = dataset[dataset["Grupo"] == grupo].sort_values(config.COL_FECHA).reset_index(drop=True)
+    if d.empty:
+        raise ValueError(f"Producto desconocido: {grupo}")
+    return d
+
+
+def fila_semana_siguiente(dataset: pd.DataFrame, grupo: str) -> pd.Series:
+    """Variables del modelo para la semana siguiente a la última con dato.
+
+    Se agrega una fila con fecha +7 días y precio desconocido, copiando las variables externas de la última
+    semana (supuesto: se mantienen), y se recalculan calendario, rezagos, medias móviles y temporada de cosecha
+    con las funciones de `features.py`, que son las del entrenamiento."""
+    d = _precios_producto(dataset, grupo)
+    nueva = d.iloc[-1].to_dict()
+    f = pd.Timestamp(nueva[config.COL_FECHA]) + pd.Timedelta(weeks=1)
+    nueva.update({config.COL_FECHA: f, config.COL_PRECIO: np.nan, "Anio": f.year, "Mes": f.month})
+    d = pd.concat([d, pd.DataFrame([nueva])], ignore_index=True)
+    d = ft.agregar_variables_calendario(d)
+    d = ft.agregar_lags(d)
+    d = ft.agregar_medias_moviles(d)
+    d = ft.marcar_temporada_cosecha(d)
+    return d.iloc[-1]
+
+
+def _vector_tabular(fila: pd.Series, columnas, grupo: str) -> pd.DataFrame:
+    vals = {}
+    for c in columnas:
+        if c.startswith("grupo_"):
+            vals[c] = float(c == f"grupo_{grupo}")
+        elif c in fila.index:
+            vals[c] = float(fila[c])
+        else:
+            raise ValueError(f"El modelo necesita la variable '{c}', que no está en el dataset.")
+    x = pd.DataFrame([vals], columns=list(columnas))
+    if x.isna().any().any():
+        raise ValueError("Faltan datos históricos para armar las variables del modelo.")
+    return x
+
+
+def pronostico_modelos(dataset: pd.DataFrame, modelos: dict, grupos=None) -> dict:
+    """{grupo: {nombre_modelo: pronóstico USD de la semana siguiente o None si no se pudo}}.
+
+    `modelos`: {'regresion_lineal': sklearn, 'lstm': LSTMRegresor, ...}; los ausentes (None) se omiten.
+    La LSTM usa los últimos `VENTANA_LSTM` precios del producto; la regresión lineal usa la fila de variables."""
+    grupos = grupos or sorted(dataset["Grupo"].unique())
+    out = {}
+    for g in grupos:
+        res = {}
+        d = _precios_producto(dataset, g)
+        fila = fila_semana_siguiente(dataset, g)
+        for nombre in MODELOS_PRONOSTICO:
+            m = modelos.get(nombre)
+            if m is None:
+                res[nombre] = None
+                continue
+            try:
+                if nombre == "lstm":
+                    ult = d[config.COL_PRECIO].to_numpy(float)[-VENTANA_LSTM:]
+                    if len(ult) < VENTANA_LSTM or not np.isfinite(ult).all():
+                        raise ValueError("historia insuficiente")
+                    v = float(m.predict(ult.reshape(1, VENTANA_LSTM, 1))[0])
+                else:
+                    v = float(m.predict(_vector_tabular(fila, list(m.feature_names_in_), g))[0])
+                res[nombre] = round(max(v, 0.0), 2) if np.isfinite(v) else None
+            except Exception:
+                res[nombre] = None
+        out[g] = res
     return out

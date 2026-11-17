@@ -66,5 +66,55 @@ def test_rango_plausible_y_plantilla():
 def test_explicacion_con_datos_reales():
     h = pr.cargar_historia()
     t = pr.pronosticar_todos(h, hoy=pd.Timestamp("2024-07-01"))
-    assert len(t) == 5 * 4 and t["semaforo"].isin(["verde", "amarillo", "rojo"]).all()
+    assert len(t) == 5 * len(pr.HORIZONTES) and t["semaforo"].isin(["verde", "amarillo", "rojo"]).all()
     assert "semana" in pr.explicacion(t.iloc[0])
+
+
+# --- pronóstico de la semana siguiente con modelos de ML ---------------------------------------------
+def _dataset_modelos(n=60, g="TOMATE"):
+    from prediccion_precios import features as ft
+    h = hist(n, g)
+    h["Anio"], h["Mes"] = h["Fecha"].dt.year, h["Fecha"].dt.month
+    h["diesel"] = 3.0 + np.arange(n) * 0.001
+    h = ft.agregar_variables_calendario(h); h = ft.agregar_lags(h); h = ft.agregar_medias_moviles(h)
+    return ft.marcar_temporada_cosecha(h)
+
+
+class _ModeloFalso:
+    """Devuelve lo que recibe en precio_lag1 (así se comprueba que la fila usa el último precio)."""
+    feature_names_in_ = ["diesel", "precio_lag1", "media_movil_4", "mes_sin", "grupo_TOMATE"]
+    def predict(self, X):
+        return X["precio_lag1"].to_numpy() * 1.1
+
+
+class _LSTMFalsa:
+    def predict(self, X):
+        assert X.shape == (1, pr.VENTANA_LSTM, 1)
+        return X[:, -1, 0]
+
+
+def test_horizonte_unico():
+    assert pr.HORIZONTES == (1,)
+    assert len(pr.pronosticar(hist(), "TOMATE").tabla()) == 1
+
+
+def test_fila_siguiente_usa_ultimo_precio_y_externas_vigentes():
+    d = _dataset_modelos(); fila = pr.fila_semana_siguiente(d, "TOMATE")
+    ult = d.sort_values("Fecha").iloc[-1]
+    assert fila["Fecha"] == ult["Fecha"] + pd.Timedelta(weeks=1)
+    assert fila["precio_lag1"] == pytest.approx(ult["Precio"])
+    assert fila["diesel"] == pytest.approx(ult["diesel"])          # externas: último valor conocido
+    p = d.sort_values("Fecha")["Precio"].to_numpy()
+    assert fila["media_movil_4"] == pytest.approx(p[-4:].mean())
+
+
+def test_pronostico_modelos_y_ausentes():
+    d = _dataset_modelos(); p_ult = float(d.sort_values("Fecha")["Precio"].iloc[-1])
+    r = pr.pronostico_modelos(d, {"regresion_lineal": _ModeloFalso(), "lstm": _LSTMFalsa()})["TOMATE"]
+    assert r["regresion_lineal"] == pytest.approx(round(p_ult * 1.1, 2), abs=0.01)
+    assert r["lstm"] == pytest.approx(round(p_ult, 2), abs=0.01)
+    assert pr.pronostico_modelos(d, {"regresion_lineal": _ModeloFalso(), "lstm": None})["TOMATE"]["lstm"] is None
+    class Roto:
+        feature_names_in_ = ["no_existe"]
+        def predict(self, X): return [0]
+    assert pr.pronostico_modelos(d, {"regresion_lineal": Roto()})["TOMATE"]["regresion_lineal"] is None

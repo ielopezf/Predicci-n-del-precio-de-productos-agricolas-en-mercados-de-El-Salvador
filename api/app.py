@@ -102,8 +102,8 @@ def equidad():
 
 @app.get("/api/pronostico")
 def pronostico():
-    """Pronóstico 1–4 semanas por persistencia. ?producto=TOMATE (opcional) &precio=12.5 (opcional, requiere producto)
-    &fecha_base=2025-01-05 (opcional)."""
+    """Pronóstico de la semana siguiente: persistencia (referencia) con intervalos empíricos, más la predicción de la
+    regresión lineal y de la LSTM (si está disponible). ?producto=TOMATE (opcional)."""
     from prediccion_precios import pronostico as pr
     import pandas as pd
     hist = pr.cargar_historia()
@@ -119,6 +119,11 @@ def pronostico():
             tabla = pr.pronosticar_todos(hist)
     except (ValueError, KeyError) as e:
         return jsonify({"error": str(e)}), 400
+    if not request.args.get("precio") and "fecha_base" not in request.args:
+        alt = reg.pronostico_siguiente()
+        for nombre in ("regresion_lineal", "lstm"):
+            tabla[f"pronostico_{nombre}"] = tabla["grupo"].map(lambda g: alt.get(g, {}).get(nombre))
+        tabla = tabla.astype(object).where(tabla.notna(), None)
     tabla["fecha_base"] = tabla["fecha_base"].astype(str)
     tabla["fecha_objetivo"] = tabla["fecha_objetivo"].astype(str)
     return jsonify(tabla.to_dict(orient="records"))

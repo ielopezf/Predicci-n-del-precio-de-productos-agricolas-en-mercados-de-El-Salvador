@@ -127,11 +127,14 @@ NOMBRES_METRICAS = {
 
 COLUMNAS_PRONOSTICO = {
     "producto": "Producto", "horizonte_sem": "Semanas a pronosticar", "fecha_base": "Fecha del último precio",
-    "fecha_objetivo": "Fecha pronosticada", "precio_base": "Último precio (USD)", "pronostico": "Pronóstico (USD)",
+    "fecha_objetivo": "Fecha pronosticada", "precio_base": "Último precio (USD)", "pronostico": "Persistencia, referencia (USD)",
     "lim_inf_80": "Límite inferior 80 % (USD)", "lim_sup_80": "Límite superior 80 % (USD)",
     "lim_inf_90": "Límite inferior 90 % (USD)", "lim_sup_90": "Límite superior 90 % (USD)",
     "mape_prueba_%": "Error de prueba (MAPE, %)", "semaforo": "Confiabilidad", "avisos": "Avisos",
+    "pronostico_regresion_lineal": "Regresión lineal (USD)", "pronostico_lstm": "LSTM (USD)",
 }
+MOSTRAR_CARGA_ARCHIVO = False   # carga de precios vigentes oculta; poner True para habilitarla
+MODELOS_ALTERNATIVOS = ("regresion_lineal", "lstm")
 CONFIABILIDAD = {"verde": "Alta", "amarillo": "Media", "rojo": "Baja", "gris": "No evaluada"}
 
 
@@ -152,6 +155,11 @@ def _unidad(producto, larga=False):
         if clave in n:
             return desc if larga else corta
     return "unidad" if not larga else "unidad de venta"
+
+
+def _quitar_antiguedad(txt):
+    """Quita de los avisos el de antigüedad del dato (esa nota vive en el bloque de carga de archivo)."""
+    return " | ".join(a for a in str(txt).split(" | ") if a and a != "nan" and "antigüedad" not in a)
 
 
 def _nombre_variable(c):
@@ -198,7 +206,7 @@ def _reflujo_vinetas(texto):
     return "\n".join(f"- {i}" for i in items)
 
 
-def _grafico_pronostico(hist_g, tabla_g, unidad="unidad", semanas_hist=26):
+def _grafico_pronostico(hist_g, tabla_g, unidad="unidad", semanas_hist=26, modelos=None):
     """Precio observado (últimas semanas del MAG) + pronóstico con bandas de 80 % y 90 %: muestra de dónde parte la predicción."""
     obs = hist_g.sort_values("Fecha").tail(semanas_hist)[["Fecha", "Precio"]].rename(columns={"Precio": "valor"})
     obs["serie"] = "Precio observado"
@@ -229,7 +237,18 @@ def _grafico_pronostico(hist_g, tabla_g, unidad="unidad", semanas_hist=26):
                                   legend=None),
         tooltip=["serie", alt.Tooltip("Fecha:T"), alt.Tooltip("valor:Q", format=".2f", title="USD")])
     pto = alt.Chart(f.head(1)).mark_point(size=90, filled=True, color="#2e9e5b").encode(x=x, y=alt.Y("pronostico:Q", scale=y_esc))
-    return (b90 + b80 + ln + pto).resolve_scale(color="independent").properties(height=280)
+    capas = b90 + b80 + ln + pto
+    pm = [{"Fecha": pd.to_datetime(tabla_g["fecha_objetivo"].iloc[0]), "valor": v, "modelo": _nombre_modelo(n)}
+          for n, v in (modelos or {}).items() if v is not None]
+    if pm:
+        dom = [_nombre_modelo(n) for n, v in (modelos or {}).items() if v is not None]
+        rng = [{"Regresión lineal": "#d97706", "LSTM": "#8b5cf6"}.get(d, "#444") for d in dom]
+        capas = capas + alt.Chart(pd.DataFrame(pm)).mark_point(size=110, filled=True, shape="diamond").encode(
+            x=x, y=alt.Y("valor:Q", scale=y_esc),
+            color=alt.Color("modelo:N", scale=alt.Scale(domain=dom, range=rng),
+                            legend=alt.Legend(orient="bottom", title=None)),
+            tooltip=["modelo", alt.Tooltip("valor:Q", format=".2f", title="USD")])
+    return capas.resolve_scale(color="independent").properties(height=280)
 
 
 def _pastel(df, cat, val, umbral=1.0):
@@ -274,9 +293,10 @@ def vista_pronostico():
     from prediccion_precios import pronostico as pr
 
     st.caption(
-        "Pronóstico a 1–4 semanas con **persistencia** (el último precio) e intervalos empíricos. "
-        "Es el método que el informe respalda: ningún modelo de ML lo superó de forma robusta en la prueba. "
-        "El intervalo es orientativo: en la prueba cubrió 63 % (nominal 80 %) y 73 % (nominal 90 %)."
+        "Pronóstico del precio de la **semana siguiente**. La **persistencia** (el último precio) es la referencia, con "
+        "intervalos empíricos: ningún modelo de ML la superó de forma robusta en la prueba. Como alternativas se muestran "
+        "la **regresión lineal** y la **LSTM**, que suponen que combustible, lluvia, IPC y producción se mantienen en su "
+        "último valor conocido. Los intervalos son orientativos: en la prueba cubrieron 63 % (nominal 80 %) y 73 % (nominal 90 %)."
     )
 
     st.caption(TEXTO_UNIDADES)
@@ -287,44 +307,42 @@ def vista_pronostico():
 
     hist = _historia()
     ult_fecha = hist["Fecha"].max()
-    st.warning(
-        f"Los datos históricos terminan el {ult_fecha.date()}. Para un pronóstico útil hoy, cargue el "
-        "precio vigente (abajo). Sin eso, el pronóstico corresponde a esa fecha, no a hoy."
-    )
 
     grupos = sorted(hist["Grupo"].unique())
-    with st.expander("Cargar precios vigentes (archivo)", expanded=True):
-        st.markdown(
-            "**Formato requerido** (.csv o .xlsx, máx. 2 MB): exactamente tres columnas "
-            "`Fecha` (AAAA-MM-DD), `Producto` (el nombre debe contener ARROZ, FRIJOL, MAÍZ, NARANJA o TOMATE) "
-            "y `Precio` (USD por la unidad de venta del producto, número con punto decimal: quintal para arroz, frijol y maíz; "
-            "ciento para naranja; caja para tomate). Use los precios de la plaza Calle Gerardo Barrios (granos) y del "
-            "Mercado Mayorista La Tiendona (hortalizas y frutas), que son los de la serie histórica; no los de las tablas "
-            "nacionales o departamentales. Se usa la última fila de cada producto. "
-            "Los precios muy fuera del rango histórico se rechazan."
-        )
-        st.code(pr.plantilla_csv(hist), language="csv")
-        st.download_button("Descargar plantilla", pr.plantilla_csv(hist).encode("utf-8"),
-                           "plantilla_precios.csv", "text/csv")
-        archivo = st.file_uploader("Cargar archivo", type=["csv", "xlsx"])
-        if archivo is not None and archivo.size > 2 * 1024 * 1024:
-            st.error("El archivo supera 2 MB.")
-            archivo = None
-    precios, fecha_base = {}, None
-    if archivo is not None:
-        try:
-            ult = pr.leer_reporte_mag(archivo, hist)
-            precios.update({g: p for g, (f, p) in ult.items()})
-            fecha_base = max(f for f, _ in ult.values()) if ult else None
-            st.success(f"Reporte leído: {len(ult)} producto(s) reconocido(s).")
-        except Exception as e:
-            st.error(f"No se pudo leer el reporte: {e}")
+    precios, fecha_base, archivo = {}, None, None
+    if MOSTRAR_CARGA_ARCHIVO:
+        with st.expander("Cargar precios vigentes (archivo)", expanded=True):
+            st.info(
+                f"Los datos históricos terminan el {ult_fecha.date()}. Para obtener el pronóstico a la fecha actual, "
+                "cargue aquí el precio vigente; sin archivo, el pronóstico corresponde a esa última fecha."
+            )
+            st.markdown(
+                "**Formato requerido** (.csv o .xlsx, máx. 2 MB): exactamente tres columnas "
+                "`Fecha` (AAAA-MM-DD), `Producto` (el nombre debe contener ARROZ, FRIJOL, MAÍZ, NARANJA o TOMATE) "
+                "y `Precio` (USD por la unidad de venta del producto, número con punto decimal: quintal para arroz, frijol y maíz; "
+                "ciento para naranja; caja para tomate). Use los precios de la plaza Calle Gerardo Barrios (granos) y del "
+                "Mercado Mayorista La Tiendona (hortalizas y frutas), que son los de la serie histórica; no los de las tablas "
+                "nacionales o departamentales. Se usa la última fila de cada producto. "
+                "Los precios muy fuera del rango histórico se rechazan."
+            )
+            st.code(pr.plantilla_csv(hist), language="csv")
+            st.download_button("Descargar plantilla", pr.plantilla_csv(hist).encode("utf-8"),
+                               "plantilla_precios.csv", "text/csv")
+            archivo = st.file_uploader("Cargar archivo", type=["csv", "xlsx"])
+            if archivo is not None and archivo.size > 2 * 1024 * 1024:
+                st.error("El archivo supera 2 MB.")
+                archivo = None
+        if archivo is not None:
+            try:
+                ult = pr.leer_reporte_mag(archivo, hist)
+                precios.update({g: p for g, (f, p) in ult.items()})
+                fecha_base = max(f for f, _ in ult.values()) if ult else None
+                st.success(f"Reporte leído: {len(ult)} producto(s) reconocido(s).")
+            except Exception as e:
+                st.error(f"No se pudo leer el reporte: {e}")
 
-    col_prod, col_sem = st.columns([3, 2])
-    sel = col_prod.multiselect("Productos a consultar", grupos, default=grupos)
-    h_sel = int(col_sem.number_input("Semanas a pronosticar", min_value=1, max_value=4, value=1, step=1,
-                                     help="Cuántas semanas hacia adelante se estima el precio (de 1 a 4), "
-                                          "contadas desde la última fecha con dato. Use + y − para cambiar."))
+    sel = st.multiselect("Productos a consultar", grupos, default=grupos)
+    h_sel = 1
     if not sel:
         st.info("Seleccione al menos un producto.")
         return
@@ -334,14 +352,48 @@ def vista_pronostico():
              "amarillo": ("orange", "Confiabilidad media (error de prueba 5–15 %)"),
              "rojo": ("red", "Confiabilidad baja (error de prueba > 15 %)"),
              "gris": ("gray", "Confiabilidad no evaluada")}
+    try:   # alternativas de ML; solo coherentes con la serie histórica (no con un archivo cargado)
+        alt_ml = {} if precios else cargar_registry().pronostico_siguiente()
+    except Exception:
+        alt_ml = {}
+    disponibles = [n for n in MODELOS_ALTERNATIVOS if any(v.get(n) is not None for v in alt_ml.values())]
+    r = tabla[tabla["horizonte_sem"] == h_sel]
+    resumen = pd.DataFrame({
+        "Producto": r["producto"].str.title().to_numpy(),
+        "Unidad de venta": r["grupo"].map(lambda g: _unidad(g, larga=True)).to_numpy(),
+        "Fecha pronosticada": r["fecha_objetivo"].astype(str).to_numpy(),
+        "Último precio (USD)": r["precio_base"].map("{:.2f}".format).to_numpy(),
+        "Persistencia, referencia (USD)": r["pronostico"].map("{:.2f}".format).to_numpy(),
+        **{f"{_nombre_modelo(n)} (USD)": [f"{alt_ml[g][n]:.2f}" if alt_ml.get(g, {}).get(n) is not None else "—"
+                                          for g in r["grupo"]] for n in disponibles},
+        "Rango probable (80 %)": [f"{a:.2f} – {b:.2f}" for a, b in zip(r["lim_inf_80"], r["lim_sup_80"])],
+        "Rango amplio (90 %)": [f"{a:.2f} – {b:.2f}" for a, b in zip(r["lim_inf_90"], r["lim_sup_90"])],
+        "Confiabilidad": r["semaforo"].map(CONFIABILIDAD).to_numpy(),
+    })
+    st.subheader("Resumen del pronóstico de la semana siguiente")
+    st.dataframe(resumen, hide_index=True, width="stretch")
+    st.caption(f"Datos históricos del MAG hasta el {ult_fecha.date()}. Los precios están en USD por la unidad de venta indicada. "
+               "Los rangos (80 % y 90 %) se calculan alrededor de la persistencia con la variación histórica del precio.")
+    if len(disponibles) < len(MODELOS_ALTERNATIVOS):
+        faltan = ", ".join(_nombre_modelo(n) for n in MODELOS_ALTERNATIVOS if n not in disponibles)
+        st.caption(f"No disponible en este momento: {faltan}.")
     for g in sel:
         f = tabla[(tabla["grupo"] == g) & (tabla["horizonte_sem"] == h_sel)].iloc[0]
         color, etiqueta = nivel[f["semaforo"]]
         st.subheader(f["producto"].title())
         st.markdown(f":{color}-badge[{etiqueta}]")
-        c1, c2, c3 = st.columns(3)
         u = _unidad(g)
-        c1.metric(f"Pronóstico {f['fecha_objetivo']} (USD por {u})", f"{f['pronostico']:.2f}")
+        mods = alt_ml.get(g, {})
+        cols = st.columns(1 + len(disponibles))
+        cols[0].metric(f"Persistencia, referencia ({f['fecha_objetivo']})", f"{f['pronostico']:.2f} USD por {u}")
+        for col, n in zip(cols[1:], disponibles):
+            v = mods.get(n)
+            if v is None:
+                col.metric(_nombre_modelo(n), "No disponible")
+            else:
+                col.metric(_nombre_modelo(n), f"{v:.2f} USD por {u}",
+                           delta=f"{v - f['pronostico']:+.2f} frente a la referencia", delta_color="off")
+        c2, c3 = st.columns(2)
         c2.metric(f"Intervalo 80 % (USD por {u})", f"{f['lim_inf_80']:.2f} – {f['lim_sup_80']:.2f}")
         c3.metric(f"Intervalo 90 % (USD por {u})", f"{f['lim_inf_90']:.2f} – {f['lim_sup_90']:.2f}")
         st.write(pr.explicacion(f).replace("$", "\\$"))
@@ -350,14 +402,19 @@ def vista_pronostico():
             origen = f"último precio del archivo cargado ({f['fecha_base']})"
         else:
             origen = f"último precio registrado por el MAG ({hist_g['Fecha'].max().date()})"
-        st.altair_chart(_grafico_pronostico(hist_g, tabla[tabla["grupo"] == g], u), width="stretch")
+        st.altair_chart(_grafico_pronostico(hist_g, tabla[tabla["grupo"] == g], u,
+                                                  modelos={n: mods.get(n) for n in disponibles}), width="stretch")
         st.caption(f"Datos usados: serie semanal de precios del MAG (línea gris, últimas 26 semanas). "
                    f"El pronóstico parte del {origen}, por **{f['precio_base']:.2f} USD por {u}**; "
-                   "las bandas azules son el rango donde se espera el precio: oscura 80 %, clara 90 % (orientativas; en la prueba cubrieron 63 % y 73 %).".replace("$", "\\$"))
-        for a in str(f["avisos"]).split(" | "):
-            if a and a != "nan":
+                   "las bandas azules son el rango donde se espera el precio: oscura 80 %, clara 90 % (orientativas; en la prueba cubrieron 63 % y 73 %). "
+                   "Los rombos son lo que estiman los modelos de ML, y se interpretan como una alternativa a la referencia, no como un pronóstico mejor.".replace("$", "\\$"))
+        for a in _quitar_antiguedad(f["avisos"]).split(" | "):
+            if a:
                 st.warning(a)
+    for n in disponibles:
+        tabla[f"pronostico_{n}"] = tabla["grupo"].map(lambda g, n=n: alt_ml.get(g, {}).get(n))
     descarga = tabla.assign(semaforo=lambda d: d["semaforo"].map(CONFIABILIDAD),
+                            avisos=lambda d: d["avisos"].map(_quitar_antiguedad),
                             unidad=lambda d: d["grupo"].map(lambda g: _unidad(g, larga=True))) \
         .drop(columns=["grupo"]).rename(columns={**COLUMNAS_PRONOSTICO, "unidad": "Unidad de venta"})
     st.download_button("Descargar tabla del pronóstico (CSV)", descarga.to_csv(index=False).encode("utf-8-sig"),
@@ -521,7 +578,7 @@ def vista_backtest():
         st.markdown(_reflujo_vinetas(equidad["reporte"].split("Limitaciones y consideraciones éticas:")[-1]))
 
 
-tab_back, tab_pron = st.tabs(["Backtest y comparación de modelos", "Pronóstico (1–4 semanas)"])
+tab_back, tab_pron = st.tabs(["Backtest y comparación de modelos", "Pronóstico (1 semana)"])
 with tab_back:
     vista_backtest()
 with tab_pron:
