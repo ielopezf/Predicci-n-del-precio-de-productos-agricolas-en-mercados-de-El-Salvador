@@ -123,6 +123,20 @@ def tratar_faltantes(df, freq=config.FRECUENCIA):
 # --------------------------------------------------------------------------- #
 # 5. Integración de fuentes externas
 # --------------------------------------------------------------------------- #
+def rezagar_ipc(ipc, meses=config.IPC_REZAGO_MESES):
+    """IPC mensual -> [Anio, Mes, ipc_alimentos] donde el valor de (Anio, Mes) es el IPC publicado
+    `meses` antes (el IPC de abril se usa en mayo). El primer mes sin IPC previo toma el primer
+    valor disponible (solo mayo de 2021)."""
+    p = pd.to_datetime(dict(year=ipc["Anio"], month=ipc["Mes"], day=1)) + pd.DateOffset(months=meses)
+    m = pd.DataFrame({"Anio": p.dt.year, "Mes": p.dt.month, "ipc_alimentos": ipc["ipc"].to_numpy()})
+    m = m.sort_values(["Anio", "Mes"]).reset_index(drop=True)
+    primero = ipc.sort_values(["Anio", "Mes"]).iloc[0]
+    if not ((m["Anio"] == primero["Anio"]) & (m["Mes"] == primero["Mes"])).any():
+        m = pd.concat([pd.DataFrame({"Anio": [primero["Anio"]], "Mes": [primero["Mes"]],
+                                     "ipc_alimentos": [primero["ipc"]]}), m], ignore_index=True)
+    return m
+
+
 def integrar_fuentes(df_precios, combustible=None, precipitacion=None,
                      ipc=None, produccion=None, freq=config.FRECUENCIA):
     """Une los precios semanales con las fuentes externas alineando por tiempo.
@@ -149,7 +163,7 @@ def integrar_fuentes(df_precios, combustible=None, precipitacion=None,
         df = df.merge(prec, on=config.COL_FECHA, how="left")
 
     if ipc is not None:
-        ipc_m = ipc[["Anio", "Mes", "ipc"]].rename(columns={"ipc": "ipc_transporte"})
+        ipc_m = rezagar_ipc(ipc)
         df = df.merge(ipc_m, on=["Anio", "Mes"], how="left")
 
     if produccion is not None:

@@ -40,4 +40,5 @@ def construir(ruta_precios, ruta_etapa2=None):
     causal = pc.semanal_causal(ruta_precios)
     ext = pc.con_externas(causal, base)
     producto = base.drop_duplicates("Grupo").set_index("Grupo")[config.COL_PRODUCTO].to_dict()
-    return armar_dataset_causal(ext, producto, list(base.columns))
+    columnas = ["ipc_alimentos" if c == "ipc_transporte" else c for c in base.columns]
+    return armar_dataset_causal(ext, producto, columnas)

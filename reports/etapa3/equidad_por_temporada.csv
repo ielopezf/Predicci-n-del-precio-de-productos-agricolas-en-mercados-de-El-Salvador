@@ -1,0 +1,9 @@
+grupo,n,MAE,RMSE,MAPE_%,R2,modelo
+no_cosecha,96,1.0121,1.5346,4.0725,0.9972,regresion_lineal
+cosecha,61,2.0731,3.1505,7.7738,0.9899,regresion_lineal
+no_cosecha,96,1.4726,2.2724,5.1813,0.9938,xgboost
+cosecha,61,2.4814,3.5264,10.0669,0.9874,xgboost
+no_cosecha,96,1.6391,2.5534,5.6518,0.9922,xgboost_optimizado
+cosecha,61,2.9343,4.3662,12.205,0.9806,xgboost_optimizado
+no_cosecha,96,0.7878,1.4633,3.2604,0.9974,persistencia
+cosecha,61,1.7387,3.0759,6.6893,0.9904,persistencia

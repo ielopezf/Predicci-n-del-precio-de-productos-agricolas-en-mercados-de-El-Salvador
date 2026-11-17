@@ -18,7 +18,7 @@ import pandas as pd
 from . import config, auditoria_datos as au
 
 EXTERNAS = ["diesel", "gas_regular", "gas_especial", "precipitacion_mm", "lluvia_max_mm",
-            "ipc_transporte", "area_ha", "produccion_t", "rendimiento_kg_ha"]
+            "ipc_alimentos", "area_ha", "produccion_t", "rendimiento_kg_ha"]
 
 
 def semanal_causal(ruta_precios):
@@ -40,5 +40,14 @@ def semanal_causal(ruta_precios):
 
 
 def con_externas(causal, dataset_modelado):
-    ext = dataset_modelado[[config.COL_FECHA, "Grupo"] + EXTERNAS]
+    """Une las externas del dataset de la Etapa 2; `ipc_alimentos` (con rezago de 1 mes) se
+    toma de su CSV si el dataset aún trae `ipc_transporte` u otra versión."""
+    base = dataset_modelado
+    if "ipc_alimentos" not in base.columns:
+        from . import data_loading as dl, preprocessing as pp
+        f = pd.to_datetime(base[config.COL_FECHA])
+        t = pd.DataFrame({"Anio": f.dt.year, "Mes": f.dt.month}).merge(
+            pp.rezagar_ipc(dl.cargar_ipc()), on=["Anio", "Mes"], how="left")
+        base = base.assign(ipc_alimentos=t["ipc_alimentos"].to_numpy())
+    ext = base[[config.COL_FECHA, "Grupo"] + EXTERNAS]
     return causal.merge(ext, on=[config.COL_FECHA, "Grupo"], how="inner")

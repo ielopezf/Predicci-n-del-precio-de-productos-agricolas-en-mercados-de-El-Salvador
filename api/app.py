@@ -1,5 +1,8 @@
 """app.py — API Flask de despliegue (CRISP-DM: Despliegue - Etapa 2).
 
+Despliegue: ver render.yaml (Render, gunicorn). Endpoints: /api/health, /api/productos, /api/modelos,
+/api/prediccion, /api/metricas, /api/importancia, /api/equidad y /api/pronostico.
+
 Sirve, en modo BACKTEST (precio real vs. predicho sobre el tramo de test que
 ningún modelo vio durante el entrenamiento/ajuste), los modelos entrenados en
 los notebooks 03 (baselines) y 04 (avanzados/ensemble). No ofrece pronóstico

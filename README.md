@@ -93,7 +93,7 @@ ubicados así (algunos vienen incluidos en el repositorio):
 | `precios_consolidados.xlsx` | `data/interim/` | MAG — precios de mercados mayoristas (consolidado) |
 | `precios_combustibles_sv.xlsx` | `data/external/` | Dir. Gral. de Energía, Hidrocarburos y Minas |
 | `precipitaciones_el_salvador_2021-2024.xlsx` | `data/external/` | Registros de precipitación diaria |
-| `ipc_transporte.csv` | `data/external/` | BCR — IPC partición 1.7 Transporte |
+| `ipc_alimentos.csv` | `data/external/` | BCR/ONEC — IPC 1.1 Alimentos y bebidas no alcohólicas (rezago 1 mes) |
 | `Produccion.csv` | `data/external/` | FAOSTAT — producción agrícola anual |
 | `lluvia_mensual_sv.xlsx` | `data/external/` | Lluvia mensual (opcional: solo la usan la auditoría y la prueba a10) |
 

@@ -138,11 +138,11 @@ def cargar_precipitacion(ruta=None):
 
 
 def cargar_ipc(ruta=None):
-    """IPC mensual '1.7 Transporte' (Índice Dic 2009=100), proxy del costo de transporte.
+    """IPC mensual '1.1 Alimentos y bebidas no alcohólicas' (Índice Dic 2009=100).
 
-    Se lee desde un CSV limpio (`ipc_transporte.csv`) reconstruido a partir del
-    archivo oficial del BCR, ya que el .xlsx original llegó corrupto. El CSV trae
-    columnas: concepto, Anio, Mes, ipc.
+    Se lee desde un CSV limpio (`ipc_alimentos.csv`) generado con
+    scripts/extraccion/convertir_ipc_bcr.py a partir del archivo oficial del BCR/ONEC.
+    Columnas: concepto, Anio, Mes, ipc.
 
     Returns: DataFrame [concepto, Anio, Mes, ipc, Periodo].
     """

@@ -5,6 +5,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from prediccion_precios import config, dataset_causal as dc, pipeline_causal as pc
 
 
+def _base():
+    b = pd.read_csv(config.DATASET_MODELADO, parse_dates=[config.COL_FECHA])
+    return b.rename(columns={"ipc_transporte": "ipc_alimentos"})  # solo estructura: la receta no depende del IPC
+
+
 def _seudo_causal(base):
     c = base[[config.COL_FECHA, "Grupo"] + pc.EXTERNAS].copy()
     c["precio_vigente"] = base[config.COL_PRECIO].to_numpy()
@@ -13,7 +18,7 @@ def _seudo_causal(base):
 
 
 def test_receta_reproduce_dataset_etapa2():
-    base = pd.read_csv(config.DATASET_MODELADO, parse_dates=[config.COL_FECHA])
+    base = _base()
     prod = base.drop_duplicates("Grupo").set_index("Grupo")[config.COL_PRODUCTO].to_dict()
     d, _ = dc.armar_dataset_causal(_seudo_causal(base), prod, list(base.columns))
     a = base.sort_values(["Grupo", config.COL_FECHA]).reset_index(drop=True)
@@ -29,7 +34,7 @@ def test_receta_reproduce_dataset_etapa2():
 
 
 def test_ffill_sin_futuro_ni_relleno_hacia_atras():
-    base = pd.read_csv(config.DATASET_MODELADO, parse_dates=[config.COL_FECHA])
+    base = _base()
     prod = base.drop_duplicates("Grupo").set_index("Grupo")[config.COL_PRODUCTO].to_dict()
     c = _seudo_causal(base).sort_values(["Grupo", config.COL_FECHA]).reset_index(drop=True)
     g = c["Grupo"] == "MAÍZ"
@@ -40,3 +45,13 @@ def test_ffill_sin_futuro_ni_relleno_hacia_atras():
     m = d[d["Grupo"] == "MAÍZ"]
     assert len(m) == g.sum() - 2
     assert m[config.COL_PRECIO].notna().all()
+
+
+def test_ipc_alimentos_rezago_un_mes():
+    from prediccion_precios import data_loading as dl, preprocessing as pp
+    ipc = dl.cargar_ipc()
+    m = pp.rezagar_ipc(ipc).set_index(["Anio", "Mes"])["ipc_alimentos"]
+    v = ipc.set_index(["Anio", "Mes"])["ipc"]
+    assert m[(2021, 6)] == v[(2021, 5)] and m[(2024, 6)] == v[(2024, 5)]   # junio usa el IPC de mayo
+    assert m[(2021, 5)] == v[(2021, 5)]                                    # único mes sin IPC previo
+    assert "ipc_transporte" not in pc.EXTERNAS and "ipc_alimentos" in pc.EXTERNAS

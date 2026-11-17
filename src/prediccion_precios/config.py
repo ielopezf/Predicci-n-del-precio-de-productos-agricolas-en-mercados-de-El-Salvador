@@ -64,7 +64,8 @@ PRODUCTOS_OBJETIVO = [
 # Archivos colocados por el equipo en data/external/.
 FUENTE_COMBUSTIBLE = EXTERNAL_DIR / "precios_combustibles_sv.xlsx"      # diario, por región y tipo
 FUENTE_PRECIPITACION = EXTERNAL_DIR / "precipitaciones_el_salvador_2021-2024.xlsx"  # diario
-FUENTE_IPC = EXTERNAL_DIR / "ipc_transporte.csv"   # mensual (IPC 1.7 Transporte, Dic 2009=100)
+FUENTE_IPC = EXTERNAL_DIR / "ipc_alimentos.csv"     # mensual (IPC 1.1 Alimentos y bebidas no alcohólicas, Dic 2009=100)
+IPC_REZAGO_MESES = 1   # el IPC de un mes se publica al terminar: una semana usa el IPC del mes ANTERIOR (sin fuga)
 FUENTE_PRODUCCION = EXTERNAL_DIR / "Produccion.csv"                      # anual (FAOSTAT)
 
 # Mapeo producto agrícola -> "Item" de producción FAOSTAT (para unir por cultivo).

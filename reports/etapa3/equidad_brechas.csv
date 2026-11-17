@@ -1,0 +1,5 @@
+modelo,brecha_productos,brecha_temporada
+regresion_lineal,18.45,1.91
+xgboost,59.02,1.94
+xgboost_optimizado,44.37,2.16
+persistencia,75.76,2.05

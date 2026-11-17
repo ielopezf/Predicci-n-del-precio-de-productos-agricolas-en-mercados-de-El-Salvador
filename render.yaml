@@ -1,0 +1,12 @@
+# Despliegue de la API en Render (Blueprint). En Render: New + > Blueprint > elegir este repositorio.
+services:
+  - type: web
+    name: prediccion-precios-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r api/requirements.txt
+    startCommand: cd api && gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.3

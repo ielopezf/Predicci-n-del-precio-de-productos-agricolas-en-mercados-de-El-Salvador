@@ -1,0 +1,103 @@
+modelo,variable,shap_medio_abs,importancia_nativa,familia
+regresion_lineal,Anio,0.007522994072557327,0.02593566248114476,otras (producto/año)
+regresion_lineal,Mes,0.05990169865468233,0.02173963635872662,otras (producto/año)
+regresion_lineal,diesel,0.030713525075477335,0.22400475555711863,combustible
+regresion_lineal,gas_regular,0.022247041290209504,0.1083806725499604,combustible
+regresion_lineal,gas_especial,0.02613114397497763,0.09920465482278355,combustible
+regresion_lineal,precipitacion_mm,0.37204811609205396,0.01025337368163198,clima (lluvia)
+regresion_lineal,lluvia_max_mm,0.01841577081081327,0.00011389335641253249,clima (lluvia)
+regresion_lineal,ipc_alimentos,0.003868764757930071,0.006394208193093125,IPC alimentos
+regresion_lineal,area_ha,1.9932745697736574,2.3511699483389917e-05,producción
+regresion_lineal,produccion_t,1.920008619204279,8.138218857856275e-06,producción
+regresion_lineal,rendimiento_kg_ha,0.08996234086908621,5.310916945290084e-06,producción
+regresion_lineal,mes,0.05990169865552142,0.02173963635903115,calendario
+regresion_lineal,trimestre,0.004139277450646856,0.0054487009285784874,calendario
+regresion_lineal,semana_anio,0.03426032506689226,0.0028577270645844216,calendario
+regresion_lineal,mes_sin,0.1036212776080453,0.29902205333424475,calendario
+regresion_lineal,mes_cos,0.018507333940510514,0.027145885249869488,calendario
+regresion_lineal,semana_sin,0.10841240160758792,0.2857136759486022,calendario
+regresion_lineal,semana_cos,0.07846819413414967,0.11555055638769975,calendario
+regresion_lineal,precio_lag1,24.18441263595959,0.984584438703018,precio pasado
+regresion_lineal,precio_lag2,3.911907240545625,0.1588576836884554,precio pasado
+regresion_lineal,precio_lag4,3.369427280501979,0.13543292570027357,precio pasado
+regresion_lineal,precio_lag8,0.4350862093555609,0.017380131290612548,precio pasado
+regresion_lineal,media_movil_4,2.798921949098145,0.11330765850546926,precio pasado
+regresion_lineal,desv_movil_4,0.03774158967940925,0.03167833681908227,precio pasado
+regresion_lineal,media_movil_8,13.130070953255993,0.5282172234324594,precio pasado
+regresion_lineal,desv_movil_8,0.08933880122691173,0.05434718777309357,precio pasado
+regresion_lineal,media_movil_12,11.269127095194992,0.4532955582023403,precio pasado
+regresion_lineal,desv_movil_12,0.13813494033173143,0.07265539121357568,precio pasado
+regresion_lineal,es_cosecha,0.13336503133291627,0.283141445831884,calendario
+regresion_lineal,grupo_ARROZ,0.008524608109911394,0.026767269465121757,otras (producto/año)
+regresion_lineal,grupo_FRIJOL,0.0058946344509051615,0.01863212419553276,otras (producto/año)
+regresion_lineal,grupo_MAÍZ,0.001733255748553056,0.005377888389779237,otras (producto/año)
+regresion_lineal,grupo_NARANJA,0.005936161091875307,0.018639545828488504,otras (producto/año)
+regresion_lineal,grupo_TOMATE,0.0016636674841826885,0.005126512169120362,otras (producto/año)
+xgboost,Anio,0.06829049438238144,0.0015662511577829719,otras (producto/año)
+xgboost,Mes,0.013467671349644661,4.5439104724209756e-05,otras (producto/año)
+xgboost,diesel,0.07183339446783066,0.0005155124817974865,combustible
+xgboost,gas_regular,0.052297551184892654,0.00031237347866408527,combustible
+xgboost,gas_especial,0.02397850900888443,0.0001290627842536196,combustible
+xgboost,precipitacion_mm,0.12612320482730865,9.078747098101303e-05,clima (lluvia)
+xgboost,lluvia_max_mm,0.06266410648822784,0.00015933788381516933,clima (lluvia)
+xgboost,ipc_alimentos,0.7391742467880249,0.026529375463724136,IPC alimentos
+xgboost,area_ha,0.33902040123939514,0.004546852316707373,producción
+xgboost,produccion_t,0.06171559914946556,0.0018394023645669222,producción
+xgboost,rendimiento_kg_ha,0.28249314427375793,0.0046952213160693645,producción
+xgboost,mes,0.0017118884716182947,1.317581336479634e-05,calendario
+xgboost,trimestre,0.0,0.0,calendario
+xgboost,semana_anio,0.10983646661043167,0.0004971541929990053,calendario
+xgboost,mes_sin,0.01166539452970028,0.00017640957958064973,calendario
+xgboost,mes_cos,0.01903713494539261,0.0001746506750350818,calendario
+xgboost,semana_sin,0.08447178453207016,0.0003422725712880492,calendario
+xgboost,semana_cos,0.02825252339243889,0.00014175176329445094,calendario
+xgboost,precio_lag1,13.95096206665039,0.19398152828216553,precio pasado
+xgboost,precio_lag2,0.9690876603126526,0.009357347153127193,precio pasado
+xgboost,precio_lag4,1.6520719528198242,0.038712192326784134,precio pasado
+xgboost,precio_lag8,1.09019935131073,0.045718591660261154,precio pasado
+xgboost,media_movil_4,1.8474607467651367,0.11202643811702728,precio pasado
+xgboost,desv_movil_4,0.08469821512699127,0.0001344590709777549,precio pasado
+xgboost,media_movil_8,4.838329315185547,0.5420038104057312,precio pasado
+xgboost,desv_movil_8,0.12050085514783859,0.00021217715402599424,precio pasado
+xgboost,media_movil_12,0.4715680778026581,0.009992221370339394,precio pasado
+xgboost,desv_movil_12,0.13036271929740906,0.00017694843700155616,precio pasado
+xgboost,es_cosecha,0.0009489533840678632,8.3455797721399e-06,calendario
+xgboost,grupo_ARROZ,0.007294285111129284,0.0019948116969317198,otras (producto/año)
+xgboost,grupo_FRIJOL,0.0040297438390553,0.003732687095180154,otras (producto/año)
+xgboost,grupo_MAÍZ,0.0,0.0,otras (producto/año)
+xgboost,grupo_NARANJA,0.00026396624161861837,1.5265997717506252e-05,otras (producto/año)
+xgboost,grupo_TOMATE,0.0009523473563604057,0.00015810549666639417,otras (producto/año)
+xgboost_optimizado,Anio,0.0,0.0,otras (producto/año)
+xgboost_optimizado,Mes,0.008131970651447773,3.202061998308636e-05,otras (producto/año)
+xgboost_optimizado,diesel,0.05963817611336708,0.0001685602474026382,combustible
+xgboost_optimizado,gas_regular,0.0640048161149025,0.00010608686716295779,combustible
+xgboost_optimizado,gas_especial,0.033378247171640396,0.0001256650866707787,combustible
+xgboost_optimizado,precipitacion_mm,0.05687060207128525,7.172728510340676e-05,clima (lluvia)
+xgboost_optimizado,lluvia_max_mm,0.05741969868540764,7.289116183528677e-05,clima (lluvia)
+xgboost_optimizado,ipc_alimentos,0.5188778638839722,0.00850524939596653,IPC alimentos
+xgboost_optimizado,area_ha,0.7299572229385376,0.014812021516263485,producción
+xgboost_optimizado,produccion_t,0.263084352016449,0.002762652700766921,producción
+xgboost_optimizado,rendimiento_kg_ha,6.743088722229004,0.7649872303009033,producción
+xgboost_optimizado,mes,0.0012442137813195586,2.2782751329941675e-05,calendario
+xgboost_optimizado,trimestre,0.0,0.0,calendario
+xgboost_optimizado,semana_anio,0.15215350687503815,0.000198937879758887,calendario
+xgboost_optimizado,mes_sin,0.01510066632181406,9.981480980059132e-05,calendario
+xgboost_optimizado,mes_cos,0.03312712162733078,0.00011351881403243169,calendario
+xgboost_optimizado,semana_sin,0.08770983666181564,0.00012122609041398391,calendario
+xgboost_optimizado,semana_cos,0.046626921743154526,0.0001179872706416063,calendario
+xgboost_optimizado,precio_lag1,9.391671180725098,0.10137113183736801,precio pasado
+xgboost_optimizado,precio_lag2,0.5583808422088623,0.0010642893612384796,precio pasado
+xgboost_optimizado,precio_lag4,1.7241504192352295,0.004918558523058891,precio pasado
+xgboost_optimizado,precio_lag8,0.8643139004707336,0.008092637173831463,precio pasado
+xgboost_optimizado,media_movil_4,3.120549201965332,0.04689038544893265,precio pasado
+xgboost_optimizado,desv_movil_4,0.12129124253988266,5.247058652457781e-05,precio pasado
+xgboost_optimizado,media_movil_8,2.0880942344665527,0.03804628178477287,precio pasado
+xgboost_optimizado,desv_movil_8,0.15902017056941986,0.00015601854829583317,precio pasado
+xgboost_optimizado,media_movil_12,0.9717395305633545,0.006947656162083149,precio pasado
+xgboost_optimizado,desv_movil_12,0.15478400886058807,8.155875548254699e-05,precio pasado
+xgboost_optimizado,es_cosecha,0.02057008445262909,6.061364183551632e-05,calendario
+xgboost_optimizado,grupo_ARROZ,0.0,0.0,otras (producto/año)
+xgboost_optimizado,grupo_FRIJOL,0.0,0.0,otras (producto/año)
+xgboost_optimizado,grupo_MAÍZ,0.0,0.0,otras (producto/año)
+xgboost_optimizado,grupo_NARANJA,0.0,0.0,otras (producto/año)
+xgboost_optimizado,grupo_TOMATE,0.0,0.0,otras (producto/año)
