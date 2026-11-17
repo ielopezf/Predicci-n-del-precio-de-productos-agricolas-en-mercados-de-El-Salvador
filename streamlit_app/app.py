@@ -127,11 +127,10 @@ NOMBRES_METRICAS = {
 
 COLUMNAS_PRONOSTICO = {
     "producto": "Producto", "horizonte_sem": "Semanas a pronosticar", "fecha_base": "Fecha del último precio",
-    "fecha_objetivo": "Fecha pronosticada", "precio_base": "Último precio (USD)", "pronostico": "Persistencia, referencia (USD)",
+    "fecha_objetivo": "Fecha pronosticada", "precio_base": "Último precio (USD)", "pronostico": "Persistencia, referencia: pronóstico (USD)",
     "lim_inf_80": "Límite inferior 80 % (USD)", "lim_sup_80": "Límite superior 80 % (USD)",
     "lim_inf_90": "Límite inferior 90 % (USD)", "lim_sup_90": "Límite superior 90 % (USD)",
     "mape_prueba_%": "Error de prueba (MAPE, %)", "semaforo": "Confiabilidad", "avisos": "Avisos",
-    "pronostico_regresion_lineal": "Regresión lineal (USD)", "pronostico_lstm": "LSTM (USD)",
 }
 MOSTRAR_CARGA_ARCHIVO = False   # carga de precios vigentes oculta; poner True para habilitarla
 MODELOS_ALTERNATIVOS = ("regresion_lineal", "lstm")
@@ -238,16 +237,23 @@ def _grafico_pronostico(hist_g, tabla_g, unidad="unidad", semanas_hist=26, model
         tooltip=["serie", alt.Tooltip("Fecha:T"), alt.Tooltip("valor:Q", format=".2f", title="USD")])
     pto = alt.Chart(f.head(1)).mark_point(size=90, filled=True, color="#2e9e5b").encode(x=x, y=alt.Y("pronostico:Q", scale=y_esc))
     capas = b90 + b80 + ln + pto
-    pm = [{"Fecha": pd.to_datetime(tabla_g["fecha_objetivo"].iloc[0]), "valor": v, "modelo": _nombre_modelo(n)}
-          for n, v in (modelos or {}).items() if v is not None]
-    if pm:
-        dom = [_nombre_modelo(n) for n, v in (modelos or {}).items() if v is not None]
+    mods_ok = {n: d for n, d in (modelos or {}).items() if d}
+    if mods_ok:
+        fecha_obj = pd.to_datetime(tabla_g["fecha_objetivo"].iloc[0])
+        pm = pd.DataFrame([{"Fecha": fecha_obj, "valor": d["valor"], "modelo": _nombre_modelo(n),
+                            "lo": d.get("lim_inf_80", d["valor"]), "hi": d.get("lim_sup_80", d["valor"])}
+                           for n, d in mods_ok.items()])
+        dom = list(pm["modelo"])
         rng = [{"Regresión lineal": "#d97706", "LSTM": "#8b5cf6"}.get(d, "#444") for d in dom]
-        capas = capas + alt.Chart(pd.DataFrame(pm)).mark_point(size=110, filled=True, shape="diamond").encode(
-            x=x, y=alt.Y("valor:Q", scale=y_esc),
-            color=alt.Color("modelo:N", scale=alt.Scale(domain=dom, range=rng),
-                            legend=alt.Legend(orient="bottom", title=None)),
-            tooltip=["modelo", alt.Tooltip("valor:Q", format=".2f", title="USD")])
+        col_m = alt.Color("modelo:N", scale=alt.Scale(domain=dom, range=rng),
+                          legend=alt.Legend(orient="bottom", title=None))
+        capas = capas + alt.Chart(pm).mark_rule(strokeWidth=3, opacity=0.6).encode(
+            x=x, y=alt.Y("lo:Q", scale=y_esc), y2="hi:Q", color=col_m) \
+            + alt.Chart(pm).mark_point(size=110, filled=True, shape="diamond").encode(
+            x=x, y=alt.Y("valor:Q", scale=y_esc), color=col_m,
+            tooltip=["modelo", alt.Tooltip("valor:Q", format=".2f", title="USD"),
+                     alt.Tooltip("lo:Q", format=".2f", title="Rango 80 %, inferior"),
+                     alt.Tooltip("hi:Q", format=".2f", title="Rango 80 %, superior")])
     return capas.resolve_scale(color="independent").properties(height=280)
 
 
@@ -358,44 +364,55 @@ def vista_pronostico():
         alt_ml = {}
     disponibles = [n for n in MODELOS_ALTERNATIVOS if any(v.get(n) is not None for v in alt_ml.values())]
     r = tabla[tabla["horizonte_sem"] == h_sel]
-    resumen = pd.DataFrame({
-        "Producto": r["producto"].str.title().to_numpy(),
-        "Unidad de venta": r["grupo"].map(lambda g: _unidad(g, larga=True)).to_numpy(),
-        "Fecha pronosticada": r["fecha_objetivo"].astype(str).to_numpy(),
-        "Último precio (USD)": r["precio_base"].map("{:.2f}".format).to_numpy(),
-        "Persistencia, referencia (USD)": r["pronostico"].map("{:.2f}".format).to_numpy(),
-        **{f"{_nombre_modelo(n)} (USD)": [f"{alt_ml[g][n]:.2f}" if alt_ml.get(g, {}).get(n) is not None else "—"
-                                          for g in r["grupo"]] for n in disponibles},
-        "Rango probable (80 %)": [f"{a:.2f} – {b:.2f}" for a, b in zip(r["lim_inf_80"], r["lim_sup_80"])],
-        "Rango amplio (90 %)": [f"{a:.2f} – {b:.2f}" for a, b in zip(r["lim_inf_90"], r["lim_sup_90"])],
-        "Confiabilidad": r["semaforo"].map(CONFIABILIDAD).to_numpy(),
-    })
+    filas = []
+    for _, fila in r.iterrows():
+        g = fila["grupo"]
+        base = {"Producto": fila["producto"].title(), "Unidad de venta": _unidad(g, larga=True),
+                "Fecha pronosticada": str(fila["fecha_objetivo"]), "Último precio (USD)": f"{fila['precio_base']:.2f}"}
+        filas.append({**base, "Método": "Persistencia (referencia)", "Pronóstico (USD)": f"{fila['pronostico']:.2f}",
+                      "Rango 80 %": f"{fila['lim_inf_80']:.2f} – {fila['lim_sup_80']:.2f}",
+                      "Rango 90 %": f"{fila['lim_inf_90']:.2f} – {fila['lim_sup_90']:.2f}",
+                      "Confiabilidad": CONFIABILIDAD.get(fila["semaforo"], "—")})
+        for n in disponibles:
+            d = alt_ml.get(g, {}).get(n)
+            if not d:
+                continue
+            filas.append({**base, "Método": _nombre_modelo(n), "Pronóstico (USD)": f"{d['valor']:.2f}",
+                          "Rango 80 %": f"{d['lim_inf_80']:.2f} – {d['lim_sup_80']:.2f}" if "lim_inf_80" in d else "—",
+                          "Rango 90 %": f"{d['lim_inf_90']:.2f} – {d['lim_sup_90']:.2f}" if "lim_inf_90" in d else "—",
+                          "Confiabilidad": CONFIABILIDAD.get(d.get("semaforo"), "—")})
+    resumen = pd.DataFrame(filas)
     st.subheader("Resumen del pronóstico de la semana siguiente")
     st.dataframe(resumen, hide_index=True, width="stretch")
     st.caption(f"Datos históricos del MAG hasta el {ult_fecha.date()}. Los precios están en USD por la unidad de venta indicada. "
-               "Los rangos (80 % y 90 %) se calculan alrededor de la persistencia con la variación histórica del precio.")
+               "Cada método tiene su propio rango y su propia confiabilidad: la persistencia, con la variación histórica del precio; "
+               "la regresión lineal y la LSTM, con sus errores en el tramo de prueba.")
     if len(disponibles) < len(MODELOS_ALTERNATIVOS):
         faltan = ", ".join(_nombre_modelo(n) for n in MODELOS_ALTERNATIVOS if n not in disponibles)
         st.caption(f"No disponible en este momento: {faltan}.")
     for g in sel:
         f = tabla[(tabla["grupo"] == g) & (tabla["horizonte_sem"] == h_sel)].iloc[0]
-        color, etiqueta = nivel[f["semaforo"]]
         st.subheader(f["producto"].title())
-        st.markdown(f":{color}-badge[{etiqueta}]")
         u = _unidad(g)
         mods = alt_ml.get(g, {})
         cols = st.columns(1 + len(disponibles))
         cols[0].metric(f"Persistencia, referencia ({f['fecha_objetivo']})", f"{f['pronostico']:.2f} USD por {u}")
+        c_r, e_r = nivel[f["semaforo"]]
+        cols[0].caption(f"Rango 80 %: {f['lim_inf_80']:.2f} – {f['lim_sup_80']:.2f}\n\nRango 90 %: "
+                        f"{f['lim_inf_90']:.2f} – {f['lim_sup_90']:.2f}")
+        cols[0].markdown(f":{c_r}-badge[{e_r}]")
         for col, n in zip(cols[1:], disponibles):
-            v = mods.get(n)
-            if v is None:
+            d = mods.get(n)
+            if not d:
                 col.metric(_nombre_modelo(n), "No disponible")
-            else:
-                col.metric(_nombre_modelo(n), f"{v:.2f} USD por {u}",
-                           delta=f"{v - f['pronostico']:+.2f} frente a la referencia", delta_color="off")
-        c2, c3 = st.columns(2)
-        c2.metric(f"Intervalo 80 % (USD por {u})", f"{f['lim_inf_80']:.2f} – {f['lim_sup_80']:.2f}")
-        c3.metric(f"Intervalo 90 % (USD por {u})", f"{f['lim_inf_90']:.2f} – {f['lim_sup_90']:.2f}")
+                continue
+            col.metric(_nombre_modelo(n), f"{d['valor']:.2f} USD por {u}",
+                       delta=f"{d['valor'] - f['pronostico']:+.2f} frente a la referencia", delta_color="off")
+            if "lim_inf_80" in d:
+                col.caption(f"Rango 80 %: {d['lim_inf_80']:.2f} – {d['lim_sup_80']:.2f}\n\nRango 90 %: "
+                            f"{d['lim_inf_90']:.2f} – {d['lim_sup_90']:.2f}")
+                c_m, e_m = nivel.get(d["semaforo"], ("gray", "Sin dato"))
+                col.markdown(f":{c_m}-badge[{e_m}]")
         st.write(pr.explicacion(f).replace("$", "\\$"))
         hist_g = hist[hist["Grupo"] == g]
         if g in precios:
@@ -407,12 +424,19 @@ def vista_pronostico():
         st.caption(f"Datos usados: serie semanal de precios del MAG (línea gris, últimas 26 semanas). "
                    f"El pronóstico parte del {origen}, por **{f['precio_base']:.2f} USD por {u}**; "
                    "las bandas azules son el rango donde se espera el precio: oscura 80 %, clara 90 % (orientativas; en la prueba cubrieron 63 % y 73 %). "
-                   "Los rombos son lo que estiman los modelos de ML, y se interpretan como una alternativa a la referencia, no como un pronóstico mejor.".replace("$", "\\$"))
+                   "Los rombos son lo que estiman la regresión lineal y la LSTM, cada uno con su barra de rango del 80 % calculada con sus propios errores de prueba; "
+                   "son una alternativa a la referencia, no un pronóstico mejor.".replace("$", "\\$"))
         for a in _quitar_antiguedad(f["avisos"]).split(" | "):
             if a:
                 st.warning(a)
     for n in disponibles:
-        tabla[f"pronostico_{n}"] = tabla["grupo"].map(lambda g, n=n: alt_ml.get(g, {}).get(n))
+        nm = _nombre_modelo(n)
+        for campo, rot in (("valor", "Pronóstico (USD)"), ("lim_inf_80", "Rango 80 % inferior (USD)"),
+                           ("lim_sup_80", "Rango 80 % superior (USD)"), ("lim_inf_90", "Rango 90 % inferior (USD)"),
+                           ("lim_sup_90", "Rango 90 % superior (USD)"), ("mape_prueba_%", "Error de prueba (MAPE, %)"),
+                           ("semaforo", "Confiabilidad")):
+            vals = tabla["grupo"].map(lambda g, n=n, campo=campo: (alt_ml.get(g, {}).get(n) or {}).get(campo))
+            tabla[f"{nm} — {rot}"] = vals.map(CONFIABILIDAD) if campo == "semaforo" else vals
     descarga = tabla.assign(semaforo=lambda d: d["semaforo"].map(CONFIABILIDAD),
                             avisos=lambda d: d["avisos"].map(_quitar_antiguedad),
                             unidad=lambda d: d["grupo"].map(lambda g: _unidad(g, larga=True))) \

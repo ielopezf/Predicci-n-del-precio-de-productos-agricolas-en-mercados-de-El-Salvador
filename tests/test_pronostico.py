@@ -118,3 +118,15 @@ def test_pronostico_modelos_y_ausentes():
         feature_names_in_ = ["no_existe"]
         def predict(self, X): return [0]
     assert pr.pronostico_modelos(d, {"regresion_lineal": Roto()})["TOMATE"]["regresion_lineal"] is None
+
+
+def test_rango_y_semaforo_propios_del_modelo():
+    rng = np.random.default_rng(0)
+    pred = np.full(40, 10.0); real = pred * (1 + rng.normal(0, 0.03, 40))
+    r = pr.rango_semaforo_modelo(10.5, real, pred)
+    assert r["lim_inf_90"] <= r["lim_inf_80"] <= 10.5 <= r["lim_sup_80"] <= r["lim_sup_90"]
+    assert r["semaforo"] == "verde" and r["mape_prueba_%"] < 5
+    mal = pr.rango_semaforo_modelo(10.0, pred * 1.3, pred)    # error sistemático de 30 %
+    assert mal["semaforo"] == "rojo"
+    with pytest.raises(ValueError):
+        pr.rango_semaforo_modelo(10.0, real[:5], pred[:5])

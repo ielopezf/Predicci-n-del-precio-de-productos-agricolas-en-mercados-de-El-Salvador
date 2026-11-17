@@ -121,8 +121,11 @@ def pronostico():
         return jsonify({"error": str(e)}), 400
     if not request.args.get("precio") and "fecha_base" not in request.args:
         alt = reg.pronostico_siguiente()
+        campos = ("valor", "lim_inf_80", "lim_sup_80", "lim_inf_90", "lim_sup_90", "mape_prueba_%", "semaforo")
         for nombre in ("regresion_lineal", "lstm"):
-            tabla[f"pronostico_{nombre}"] = tabla["grupo"].map(lambda g: alt.get(g, {}).get(nombre))
+            for c in campos:
+                col = f"pronostico_{nombre}" if c == "valor" else f"{c}_{nombre}"
+                tabla[col] = tabla["grupo"].map(lambda g: (alt.get(g, {}).get(nombre) or {}).get(c))
         tabla = tabla.astype(object).where(tabla.notna(), None)
     tabla["fecha_base"] = tabla["fecha_base"].astype(str)
     tabla["fecha_objetivo"] = tabla["fecha_objetivo"].astype(str)

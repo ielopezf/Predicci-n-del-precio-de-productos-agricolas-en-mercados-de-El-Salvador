@@ -300,3 +300,24 @@ def pronostico_modelos(dataset: pd.DataFrame, modelos: dict, grupos=None) -> dic
                 res[nombre] = None
         out[g] = res
     return out
+
+
+def rango_semaforo_modelo(valor: float, reales, predichos) -> dict:
+    """Rangos (80 y 90 %) y semáforo PROPIOS de un modelo, a partir de su backtest.
+
+    Los rangos son cuantiles de su error relativo (real - predicho) / predicho en el tramo de prueba, aplicados al
+    valor pronosticado; el semáforo sale del MAPE del modelo en ese tramo, con los mismos umbrales que la persistencia.
+    Se calibran sobre el propio tramo de prueba, así que su cobertura no es una medida independiente."""
+    r, q = np.asarray(reales, float), np.asarray(predichos, float)
+    ok = np.isfinite(r) & np.isfinite(q) & (q > 0) & (r > 0)
+    r, q = r[ok], q[ok]
+    if len(r) < MIN_OBS_CALIBRACION:
+        raise ValueError(f"Muy pocas observaciones para calibrar el modelo ({len(r)}).")
+    rel = (r - q) / q
+    out = {}
+    for nivel in (0.80, 0.90):
+        lo, hi = intervalo(valor, rel, nivel)
+        out[f"lim_inf_{int(nivel * 100)}"], out[f"lim_sup_{int(nivel * 100)}"] = round(float(lo), 2), round(float(hi), 2)
+    mape = float(np.mean(np.abs(r - q) / r) * 100)
+    out["mape_prueba_%"], out["semaforo"] = round(mape, 2), semaforo(mape)
+    return out

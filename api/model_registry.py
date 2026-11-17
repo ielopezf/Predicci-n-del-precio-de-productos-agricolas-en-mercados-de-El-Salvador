@@ -232,6 +232,23 @@ def equidad_modelo(nombre_modelo):
 
 @functools.lru_cache(maxsize=1)
 def pronostico_siguiente():
-    """{grupo: {'regresion_lineal': USD|None, 'lstm': USD|None}} para la semana siguiente al último dato."""
+    """{grupo: {modelo: {'valor', 'lim_inf_80', 'lim_sup_80', 'lim_inf_90', 'lim_sup_90', 'mape_prueba_%', 'semaforo'}
+    | None}} para la semana siguiente al último dato; los rangos y el semáforo son propios de cada modelo."""
     from prediccion_precios import pronostico as pr
-    return pr.pronostico_modelos(_data, MODELOS)
+    base = pr.pronostico_modelos(_data, MODELOS)
+    prod_de = _data.drop_duplicates("Grupo").set_index("Grupo")[config.COL_PRODUCTO].to_dict()
+    out = {}
+    for g, modelos in base.items():
+        out[g] = {}
+        for nombre, valor in modelos.items():
+            if valor is None:
+                out[g][nombre] = None
+                continue
+            det = {"valor": valor}
+            try:
+                bt = predicciones(nombre, [prod_de[g]])
+                det.update(pr.rango_semaforo_modelo(valor, bt["precio_real"], bt["precio_predicho"]))
+            except Exception:
+                pass   # sin backtest suficiente: se muestra el valor sin rango ni semáforo
+            out[g][nombre] = det
+    return out
