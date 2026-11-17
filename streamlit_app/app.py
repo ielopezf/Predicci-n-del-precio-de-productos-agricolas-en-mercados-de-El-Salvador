@@ -509,48 +509,42 @@ def vista_backtest():
         t2.altair_chart(_barras(pt, "grupo", "MAE", "Error absoluto medio (MAE, USD)", altura=220, etiqueta_x="Temporada"), width="stretch")
 
     # --------------------------------------------------------------------------- #
-    # Series real vs. predicho, por producto
-    # --------------------------------------------------------------------------- #
-    st.subheader("Precio real vs. predicho (test histórico)")
-    pred = pd.DataFrame(api_get("/api/prediccion", {"modelo": modelo_sel, "productos": slugs_sel}))
-    if pred.empty:
-        st.warning("Sin datos de predicción para esa combinación de producto/modelo.")
-    else:
-        pred["Fecha"] = pd.to_datetime(pred["Fecha"])
-        for producto in productos_sel:
-            sub = (pred[pred["Producto"] == producto].set_index("Fecha")[["precio_real", "precio_predicho"]]
-                   .rename(columns={"precio_real": "Precio real", "precio_predicho": "Precio predicho"}))
-            if sub.empty:
-                continue
-            st.markdown(f"**{producto}** — USD por {_unidad(producto)}")
-            st.line_chart(sub)
-
-    # --------------------------------------------------------------------------- #
     # Importancia de variables (por permutación, comparable entre modelos)
     # --------------------------------------------------------------------------- #
     st.subheader("Importancia de variables")
     importancia = api_get_opcional("/api/importancia", {"modelo": modelo_sel, "top": 100})
     if isinstance(importancia, list) and importancia:
         df_imp = pd.DataFrame(importancia)
-        top = df_imp.sort_values("importancia", ascending=False).head(15)
+        df_imp["importancia"] = df_imp["importancia"].clip(lower=0)   # una importancia negativa es ruido: cuenta como 0
         total = df_imp["importancia"].sum()
         if total > 0:
+            top = df_imp.sort_values("importancia", ascending=False).head(15)
             datos = top.assign(grupo=top["feature"].map(_nombre_variable))[["grupo", "importancia"]]
+            resto = total - top["importancia"].sum()
+            if resto > 1e-12:   # el pastel suma 100 %: el resto de variables va en una porción aparte
+                datos = pd.concat([datos, pd.DataFrame([{"grupo": "Otras variables", "importancia": resto}])],
+                                  ignore_index=True)
             st.altair_chart(_pastel(datos, "grupo", "importancia", umbral=4), width="stretch")
-            fam = (df_imp.groupby("familia")["importancia"].sum() / total * 100).sort_values(ascending=False)
-            pasado = fam.get("Precio pasado", 0.0)
-            texto = (f"Los datos más relevantes son los **precios pasados** ({pasado:.0f} % de la importancia): "
+            fam = (df_imp.groupby("familia")["importancia"].sum() / total * 100)
+            pasado, prod = float(fam.get("Precio pasado", 0.0)), float(fam.get("Producción", 0.0))
+            mostrar_prod = prod >= 10
+            # enteros que suman exactamente 100 (método del mayor resto)
+            partes = [pasado, prod if mostrar_prod else 0.0]
+            partes.append(max(100.0 - sum(partes), 0.0))
+            base = [int(x) for x in partes]
+            for i in sorted(range(3), key=lambda i: partes[i] - base[i], reverse=True)[:100 - sum(base)]:
+                base[i] += 1
+            pasado_i, prod_i, otras_i = base
+            texto = (f"Los datos más relevantes son los **precios pasados** ({pasado_i} % de la importancia): "
                      "el modelo se apoya casi por completo en lo que ya ocurrió con el precio. ")
-            prod = fam.get("Producción", 0.0)
-            if prod >= 10:
-                texto += (f"La **producción** también pesa ({prod:.0f} %), pero al ser una cifra anual constante por producto "
+            if mostrar_prod:
+                texto += (f"La **producción** también pesa ({prod_i} %), pero al ser una cifra anual constante por producto "
                           "actúa como identificador del producto y el año más que como causa del precio. ")
-            otras = 100 - pasado - (prod if prod >= 10 else 0)
             texto += (f"El resto de variables (calendario, combustible, lluvia, IPC de alimentos) aportan en conjunto "
-                      f"{otras:.0f} %: no mejoran de forma apreciable la predicción del precio futuro.")
+                      f"{otras_i} %: no mejoran de forma apreciable la predicción del precio futuro.")
             st.markdown(texto)
             st.caption("Importancia por permutación: cuánto empeora el error al barajar la variable en el tramo de prueba. "
-                       "El pastel muestra las 15 variables principales.")
+                       "El pastel muestra las 15 variables principales y agrupa el resto en \"Otras variables\"; los porcentajes suman 100 %.")
         else:
             st.info("Las variables de este modelo no cambian su error al barajarse: no hay importancia que mostrar.")
     else:
@@ -576,6 +570,23 @@ def vista_backtest():
     if equidad["reporte"]:
         st.markdown("**Limitaciones y consideraciones éticas**")
         st.markdown(_reflujo_vinetas(equidad["reporte"].split("Limitaciones y consideraciones éticas:")[-1]))
+
+    # --------------------------------------------------------------------------- #
+    # Series real vs. predicho, por producto
+    # --------------------------------------------------------------------------- #
+    st.subheader("Precio real vs. predicho (test histórico)")
+    pred = pd.DataFrame(api_get("/api/prediccion", {"modelo": modelo_sel, "productos": slugs_sel}))
+    if pred.empty:
+        st.warning("Sin datos de predicción para esa combinación de producto/modelo.")
+    else:
+        pred["Fecha"] = pd.to_datetime(pred["Fecha"])
+        for producto in productos_sel:
+            sub = (pred[pred["Producto"] == producto].set_index("Fecha")[["precio_real", "precio_predicho"]]
+                   .rename(columns={"precio_real": "Precio real", "precio_predicho": "Precio predicho"}))
+            if sub.empty:
+                continue
+            st.markdown(f"**{producto}** — USD por {_unidad(producto)}")
+            st.line_chart(sub)
 
 
 tab_back, tab_pron = st.tabs(["Backtest y comparación de modelos", "Pronóstico (1 semana)"])
