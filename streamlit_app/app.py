@@ -214,9 +214,13 @@ def _grafico_pronostico(hist_g, tabla_g, unidad="unidad", semanas_hist=26):
     lineas = pd.concat([obs, pron], ignore_index=True)
     x = alt.X("Fecha:T", title=None)
     y_esc = alt.Scale(zero=False)
-    b90 = alt.Chart(f).mark_area(opacity=0.12, color="#4c78a8").encode(
-        x=x, y=alt.Y("lim_inf_90:Q", scale=y_esc, title=f"Precio (USD por {unidad})"), y2="lim_sup_90:Q")
-    b80 = alt.Chart(f).mark_area(opacity=0.25, color="#4c78a8").encode(x=x, y=alt.Y("lim_inf_80:Q", scale=y_esc), y2="lim_sup_80:Q")
+    dom_b = ["Intervalo 80 %", "Intervalo 90 %"]
+    color_b = alt.Color("banda:N", scale=alt.Scale(domain=dom_b, range=["#4c78a8", "#a9c4de"]),
+                        legend=alt.Legend(orient="bottom", title=None, symbolType="square"))
+    b90 = alt.Chart(f.assign(banda="Intervalo 90 %")).mark_area(opacity=0.35).encode(
+        x=x, y=alt.Y("lim_inf_90:Q", scale=y_esc, title=f"Precio (USD por {unidad})"), y2="lim_sup_90:Q", color=color_b)
+    b80 = alt.Chart(f.assign(banda="Intervalo 80 %")).mark_area(opacity=0.45).encode(
+        x=x, y=alt.Y("lim_inf_80:Q", scale=y_esc), y2="lim_sup_80:Q", color=color_b)
     ln = alt.Chart(lineas).mark_line(strokeWidth=2).encode(
         x=x, y=alt.Y("valor:Q", scale=y_esc),
         color=alt.Color("serie:N", scale=alt.Scale(domain=["Precio observado", "Pronóstico"], range=["#6b7280", "#2e9e5b"]),
@@ -225,7 +229,7 @@ def _grafico_pronostico(hist_g, tabla_g, unidad="unidad", semanas_hist=26):
                                   legend=None),
         tooltip=["serie", alt.Tooltip("Fecha:T"), alt.Tooltip("valor:Q", format=".2f", title="USD")])
     pto = alt.Chart(f.head(1)).mark_point(size=90, filled=True, color="#2e9e5b").encode(x=x, y=alt.Y("pronostico:Q", scale=y_esc))
-    return (b90 + b80 + ln + pto).properties(height=260)
+    return (b90 + b80 + ln + pto).resolve_scale(color="independent").properties(height=280)
 
 
 def _pastel(df, cat, val, umbral=1.0):
@@ -349,7 +353,7 @@ def vista_pronostico():
         st.altair_chart(_grafico_pronostico(hist_g, tabla[tabla["grupo"] == g], u), width="stretch")
         st.caption(f"Datos usados: serie semanal de precios del MAG (línea gris, últimas 26 semanas). "
                    f"El pronóstico parte del {origen}, por **{f['precio_base']:.2f} USD por {u}**; "
-                   "la banda oscura es el intervalo de 80 % y la clara el de 90 %.".replace("$", "\\$"))
+                   "las bandas azules son el rango donde se espera el precio: oscura 80 %, clara 90 % (orientativas; en la prueba cubrieron 63 % y 73 %).".replace("$", "\\$"))
         for a in str(f["avisos"]).split(" | "):
             if a and a != "nan":
                 st.warning(a)
