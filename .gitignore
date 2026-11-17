@@ -4,6 +4,7 @@ data/interim/*
 data/processed/*
 data/external/*
 !data/**/.gitkeep
+!data/external/ipc_alimentos.csv
 
 # Dataset necesario para la aplicación desplegada
 !data/processed/dataset_modelado.csv
@@ -23,7 +24,7 @@ models/*
 # --- Figuras generadas ---
 reports/figures/*
 !reports/figures/.gitkeep
-
+!reports/figures/*.png
 # --- Python ---
 __pycache__/
 *.py[cod]
