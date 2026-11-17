@@ -16,6 +16,7 @@ así que un forecast inventaría esos supuestos. Ver `fairness.LIMITACIONES_ETIC
 
 from __future__ import annotations
 
+import functools
 import re
 import sys
 import unicodedata
@@ -166,13 +167,49 @@ def metricas_modelo(nombre_modelo):
     }
 
 
+_FAMILIAS = (
+    ("Precio pasado", lambda c: c.startswith(("precio_lag", "media_movil", "desv_movil"))),
+    ("Calendario", lambda c: c in ("mes", "trimestre", "semana_anio", "mes_sin", "mes_cos", "semana_sin", "semana_cos", "es_cosecha")),
+    ("Combustible", lambda c: c in ("diesel", "gas_regular", "gas_especial")),
+    ("Lluvia", lambda c: c in ("precipitacion_mm", "lluvia_max_mm")),
+    ("IPC alimentos", lambda c: c.startswith("ipc")),
+    ("Producción", lambda c: c in ("area_ha", "produccion_t", "rendimiento_kg_ha")),
+)
+
+
+def familia_variable(col):
+    return next((n for n, f in _FAMILIAS if f(col)), "Otras")
+
+
+@functools.lru_cache(maxsize=None)
+def _importancia_permutacion(nombre_modelo, repeticiones=5, semilla=42):
+    """Importancia por permutación: cuánto sube el MAE (USD) al barajar una variable en el tramo de test.
+
+    Es comparable entre TODOS los modelos (lineal, árboles, ensamble, red neuronal), a diferencia de
+    feature_importances_/coef_, que dependen del modelo y de la escala de cada variable."""
+    modelo = MODELOS[nombre_modelo]
+    y = np.asarray(Y_TEST, dtype=float)
+    base = float(np.mean(np.abs(y - modelo.predict(X_TEST))))
+    rng = np.random.default_rng(semilla)
+    filas = []
+    for col in X_TEST.columns:
+        aumentos = []
+        for _ in range(repeticiones):
+            Xp = X_TEST.copy()
+            Xp[col] = rng.permutation(Xp[col].to_numpy())
+            aumentos.append(float(np.mean(np.abs(y - modelo.predict(Xp)))) - base)
+        filas.append((col, max(float(np.mean(aumentos)), 0.0)))
+    return tuple(filas)
+
+
 def importancia_modelo(nombre_modelo, top=15):
-    """Importancia de variables (solo modelos con feature_importances_/coef_)."""
+    """Importancia de variables por permutación (aumento del MAE en USD). None si no aplica (LSTM: solo usa precios)."""
     modelo = MODELOS.get(nombre_modelo)
-    if modelo is None or not (hasattr(modelo, "feature_importances_") or hasattr(modelo, "coef_")):
+    if modelo is None or _es_lstm(nombre_modelo):
         return None
-    tabla = it.importancia_variables(modelo, X_TEST.columns).head(top)
-    return tabla.to_dict(orient="records")
+    filas = sorted(_importancia_permutacion(nombre_modelo), key=lambda f: f[1], reverse=True)[:top]
+    return [{"feature": f, "importancia": v, "familia": familia_variable(f),
+             "metodo": "permutación (aumento del MAE en USD)"} for f, v in filas]
 
 
 def equidad_modelo(nombre_modelo):

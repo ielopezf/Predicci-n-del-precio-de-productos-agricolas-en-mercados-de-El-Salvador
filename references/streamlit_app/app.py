@@ -1,0 +1,361 @@
+"""Prototipo Streamlit — Predicción de precios agrícolas en El Salvador.
+
+En Streamlit Community Cloud usa directamente ``api/model_registry.py`` y los
+artefactos versionados en ``models/`` y ``data/processed/``. Si se define la
+variable de entorno ``API_URL``, conserva el modo cliente HTTP para consumir la
+API Flask desplegada por separado.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+import altair as alt
+import pandas as pd
+import requests
+import streamlit as st
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+API_DIR = ROOT_DIR / "api"
+if str(API_DIR) not in sys.path:
+    sys.path.insert(0, str(API_DIR))
+
+API_URL = os.environ.get("API_URL", "").strip().rstrip("/")
+
+st.set_page_config(page_title="Predicción de precios agrícolas — El Salvador", layout="wide")
+
+
+# --------------------------------------------------------------------------- #
+# Capa de acceso: API externa si API_URL existe; registro local en caso contrario
+# --------------------------------------------------------------------------- #
+@st.cache_resource
+def cargar_registry():
+    import model_registry as reg
+    return reg
+
+
+def _slugs_a_productos(reg, valor):
+    if not valor:
+        return None
+    slugs = [s.strip() for s in valor.split(",") if s.strip()]
+    desconocidos = [s for s in slugs if s not in reg.SLUG_A_PRODUCTO]
+    if desconocidos:
+        raise ValueError(f"Producto(s) no reconocido(s): {desconocidos}")
+    return [reg.SLUG_A_PRODUCTO[s] for s in slugs]
+
+
+@st.cache_data(ttl=300)
+def api_get(ruta, params=None):
+    """Obtiene datos desde Flask o, en Cloud, directamente desde model_registry."""
+    params = params or {}
+
+    if API_URL:
+        r = requests.get(f"{API_URL}{ruta}", params=params, timeout=30)
+        r.raise_for_status()
+        return r.json()
+
+    reg = cargar_registry()
+
+    if ruta == "/api/productos":
+        return reg.PRODUCTOS
+    if ruta == "/api/modelos":
+        return [
+            {"nombre": n, "tipo": reg.TIPO_MODELO[n], "disponible": reg.MODELOS.get(n) is not None}
+            for n in reg.TIPO_MODELO
+        ]
+    if ruta == "/api/metricas":
+        return reg.metricas_modelo(params.get("modelo", "xgboost_optimizado"))
+    if ruta == "/api/prediccion":
+        productos = _slugs_a_productos(reg, params.get("productos"))
+        df = reg.predicciones(params.get("modelo", "xgboost_optimizado"), productos=productos).copy()
+        df["Fecha"] = df["Fecha"].astype(str)
+        return df.to_dict(orient="records")
+    if ruta == "/api/importancia":
+        return reg.importancia_modelo(
+            params.get("modelo", "xgboost_optimizado"), top=int(params.get("top", 15))
+        )
+    if ruta == "/api/equidad":
+        return reg.equidad_modelo(params.get("modelo", "xgboost_optimizado"))
+
+    raise ValueError(f"Ruta no soportada: {ruta}")
+
+
+@st.cache_data(ttl=300)
+def api_get_opcional(ruta, params=None):
+    """Como api_get, pero devuelve None cuando un recurso opcional no está disponible."""
+    try:
+        if API_URL:
+            r = requests.get(f"{API_URL}{ruta}", params=params, timeout=30)
+            if r.status_code >= 400:
+                return None
+            return r.json()
+        return api_get(ruta, params)
+    except (KeyError, ValueError):
+        return None
+
+
+COLOR_NIVEL = {"Bajo (<5 %)": "#2e9e5b", "Medio (5–15 %)": "#e0a526", "Alto (>15 %)": "#d64545"}
+
+
+def _nivel_mape(v):
+    return "Bajo (<5 %)" if v < 5 else ("Medio (5–15 %)" if v <= 15 else "Alto (>15 %)")
+
+
+def _barras(df, x, y, titulo, fmt=".2f", color=None, altura=260):
+    """Barras con el valor sobre cada barra (sin tabla)."""
+    enc_color = color if color is not None else alt.value("#4c78a8")
+    base = alt.Chart(df).encode(x=alt.X(f"{x}:N", sort=None, title=None, axis=alt.Axis(labelAngle=0, labelLimit=120)),
+                                y=alt.Y(f"{y}:Q", title=titulo))
+    barras = base.mark_bar().encode(color=enc_color, tooltip=[x, alt.Tooltip(y, format=fmt)])
+    texto = base.mark_text(dy=-7, fontSize=12).encode(text=alt.Text(f"{y}:Q", format=fmt))
+    return (barras + texto).properties(height=altura)
+
+
+def _color_nivel():
+    return alt.Color("nivel:N", scale=alt.Scale(domain=list(COLOR_NIVEL), range=list(COLOR_NIVEL.values())),
+                     legend=alt.Legend(title="Error (MAPE)", orient="bottom"))
+
+
+def _grafico_comparacion():
+    """MAPE de todos los modelos (tabla del reentrenamiento causal) con la persistencia resaltada."""
+    ruta = ROOT_DIR / "reports" / "etapa3" / "reentrenamiento_tabla.csv"
+    if not ruta.exists():
+        return None
+    d = pd.read_csv(ruta)
+    d = d.rename(columns={d.columns[0]: "Modelo"})[["Modelo", "MAPE_%"]].sort_values("MAPE_%")
+    d["tipo"] = ["Método operativo" if m.startswith("persistencia") else "Modelo de ML" for m in d["Modelo"]]
+    base = alt.Chart(d).encode(y=alt.Y("Modelo:N", sort=None, title=None),
+                               x=alt.X("MAPE_%:Q", title="MAPE (%) en prueba — menor es mejor"))
+    barras = base.mark_bar().encode(
+        color=alt.Color("tipo:N", scale=alt.Scale(domain=["Método operativo", "Modelo de ML"],
+                                                  range=["#2e9e5b", "#4c78a8"]), legend=alt.Legend(orient="bottom", title=None)),
+        tooltip=["Modelo", alt.Tooltip("MAPE_%", format=".2f")])
+    texto = base.mark_text(align="left", dx=4).encode(text=alt.Text("MAPE_%:Q", format=".2f"))
+    return (barras + texto).properties(height=300)
+
+
+st.title("Predicción de precios agrícolas — El Salvador")
+
+
+def vista_pronostico():
+    sys.path.insert(0, str(ROOT_DIR / "src"))
+    from prediccion_precios import pronostico as pr
+
+    st.caption(
+        "Pronóstico a 1–4 semanas con **persistencia** (el último precio) e intervalos empíricos. "
+        "Es el método que el informe respalda: ningún modelo de ML lo superó de forma robusta en la prueba. "
+        "El intervalo es orientativo: en la prueba cubrió 63 % (nominal 80 %) y 73 % (nominal 90 %)."
+    )
+
+    @st.cache_data
+    def _historia():
+        return pr.cargar_historia()
+
+    hist = _historia()
+    ult_fecha = hist["Fecha"].max()
+    st.warning(
+        f"Los datos históricos terminan el {ult_fecha.date()}. Para un pronóstico útil hoy, cargue el "
+        "precio vigente (abajo). Sin eso, el pronóstico corresponde a esa fecha, no a hoy."
+    )
+
+    grupos = sorted(hist["Grupo"].unique())
+    with st.expander("Precio vigente (opcional)"):
+        st.markdown(
+            "**Formato requerido** (.csv o .xlsx, máx. 2 MB): exactamente tres columnas "
+            "`Fecha` (AAAA-MM-DD), `Producto` (el nombre debe contener ARROZ, FRIJOL, MAÍZ, NARANJA o TOMATE) "
+            "y `Precio` (USD, número con punto decimal). Se usa la última fila de cada producto. "
+            "Los precios muy fuera del rango histórico se rechazan."
+        )
+        st.code(pr.plantilla_csv(hist), language="csv")
+        st.download_button("Descargar plantilla", pr.plantilla_csv(hist).encode("utf-8"),
+                           "plantilla_precios.csv", "text/csv")
+        archivo = st.file_uploader("Cargar archivo", type=["csv", "xlsx"])
+        if archivo is not None and archivo.size > 2 * 1024 * 1024:
+            st.error("El archivo supera 2 MB.")
+            archivo = None
+        manual = {}
+        for g in grupos:
+            v = st.number_input(f"{g} — precio manual", min_value=0.0, value=0.0, step=0.1, key=f"m_{g}")
+            if v > 0:
+                manual[g] = v
+    precios, fecha_base = dict(manual), None
+    if archivo is not None:
+        try:
+            ult = pr.leer_reporte_mag(archivo, hist)
+            precios.update({g: p for g, (f, p) in ult.items() if g not in manual})
+            fecha_base = max(f for f, _ in ult.values()) if ult else None
+            st.success(f"Reporte leído: {len(ult)} producto(s) reconocido(s).")
+        except Exception as e:
+            st.error(f"No se pudo leer el reporte: {e}")
+    if manual and fecha_base is None:
+        fecha_base = pd.Timestamp.today().normalize()
+
+    sel = st.multiselect("Producto(s)", grupos, default=grupos)
+    h_sel = st.slider("Horizonte (semanas)", 1, 4, 1)
+    if not sel:
+        st.info("Seleccione al menos un producto.")
+        return
+    tabla = pr.pronosticar_todos(hist, precios, fecha_base)
+    tabla = tabla[tabla["grupo"].isin(sel)]
+    icono = {"verde": "🟢", "amarillo": "🟡", "rojo": "🔴", "gris": "⚪"}
+    for g in sel:
+        f = tabla[(tabla["grupo"] == g) & (tabla["horizonte_sem"] == h_sel)].iloc[0]
+        st.subheader(f"{icono[f['semaforo']]} {f['producto'].title()}")
+        c1, c2, c3 = st.columns(3)
+        c1.metric(f"Pronóstico {f['fecha_objetivo']} (US dólares)", f"{f['pronostico']:.2f}")
+        c2.metric("Intervalo 80 %", f"{f['lim_inf_80']:.2f} – {f['lim_sup_80']:.2f}")
+        c3.metric("Intervalo 90 %", f"{f['lim_inf_90']:.2f} – {f['lim_sup_90']:.2f}")
+        st.write(pr.explicacion(f).replace("$", "\\$"))
+        for a in str(f["avisos"]).split(" | "):
+            if a and a != "nan":
+                st.warning(a)
+    with st.expander("Tabla completa (1–4 semanas)"):
+        st.dataframe(tabla.drop(columns=["grupo"]), width="stretch")
+        st.download_button("Descargar CSV", tabla.to_csv(index=False).encode("utf-8"), "pronostico.csv", "text/csv")
+    st.caption("Semáforo: verde = error de prueba < 5 %, amarillo = 5–15 % (meta del proyecto), rojo = > 15 %. "
+               "Describe el desempeño pasado, no garantiza el futuro.")
+
+
+def vista_backtest():
+    st.caption(
+        "Backtest histórico (modelos reentrenados con el tratamiento causal de datos: sin interpolar ni recortar picos): "
+    "precio real vs. predicho sobre el tramo de test que el modelo "
+        "nunca vio al entrenarse. **No es un pronóstico del futuro** — no hay valores reales "
+        "futuros de combustible, IPC o clima con los que alimentar al modelo."
+    )
+
+    try:
+        productos_disp = api_get("/api/productos")
+        modelos_disp = [m for m in api_get("/api/modelos") if m["disponible"]]
+    except requests.exceptions.RequestException as e:
+        st.error(f"No se pudo conectar con la API configurada ({API_URL}).\n\n{e}")
+        return
+    except Exception as e:
+        st.error(
+            "No se pudieron cargar los datos/modelos del prototipo. Verifica que "
+            "`data/processed/dataset_modelado.csv` y los archivos de `models/` estén "
+            f"versionados en el repositorio.\n\nDetalle: {e}"
+        )
+        return
+
+    if not modelos_disp:
+        st.warning("Todavía no hay modelos entrenados disponibles en `models/`.")
+        return
+
+    # --------------------------------------------------------------------------- #
+    # Comparación de todos los modelos
+    # --------------------------------------------------------------------------- #
+    st.subheader("Comparación de modelos")
+    g = _grafico_comparacion()
+    if g is not None:
+        st.altair_chart(g, width="stretch")
+        st.caption("La persistencia (repetir el último precio) es el método operativo y la referencia que ningún modelo "
+                   "supera. La LSTM se evalúa en un tramo propio de secuencias: no es comparable fila a fila.")
+
+    # --------------------------------------------------------------------------- #
+    # Barra lateral: selección de productos y modelo
+    # --------------------------------------------------------------------------- #
+    st.subheader("Selección")
+    col_p, col_m = st.columns([2, 1])
+    nombres_producto = [p["producto"] for p in productos_disp]
+    slug_por_producto = {p["producto"]: p["slug"] for p in productos_disp}
+
+    productos_sel = col_p.multiselect("Producto(s)", nombres_producto, default=nombres_producto[:2])
+    nombres_modelo = [m["nombre"] for m in modelos_disp]
+    etiquetas_modelo = {m["nombre"]: f"{m['nombre']} ({m['tipo']})" for m in modelos_disp}
+    modelo_sel = col_m.selectbox("Modelo", nombres_modelo, format_func=lambda n: etiquetas_modelo[n])
+
+    if not productos_sel:
+        st.info("Selecciona al menos un producto.")
+        return
+
+    slugs_sel = ",".join(slug_por_producto[p] for p in productos_sel)
+
+    # --------------------------------------------------------------------------- #
+    # Métricas globales y por producto
+    # --------------------------------------------------------------------------- #
+    metricas = api_get("/api/metricas", {"modelo": modelo_sel})
+    st.subheader(f"Métricas del modelo — {modelo_sel}")
+    cols = st.columns(4)
+    for col, (k, v) in zip(cols, metricas["globales"].items()):
+        col.metric(k, v)
+
+    st.markdown("**Error por producto**")
+    pp = pd.DataFrame(metricas["por_producto"])
+    pp["nivel"] = pp["MAPE_%"].map(_nivel_mape)
+    c1, c2, c3 = st.columns(3)
+    c1.altair_chart(_barras(pp, "grupo", "MAPE_%", "MAPE (%)", color=_color_nivel()), width="stretch")
+    c2.altair_chart(_barras(pp, "grupo", "MAE", "MAE (USD)"), width="stretch")
+    c3.altair_chart(_barras(pp, "grupo", "R2", "R²", fmt=".2f"), width="stretch")
+    st.caption("El MAPE es la métrica comparable entre productos. El R² puede ser negativo fuera de muestra cuando el "
+               "precio casi no varía en el periodo de prueba (p. ej. arroz); en ese caso un MAPE bajo es lo que importa.")
+
+    if metricas["por_temporada"]:
+        st.markdown("**Cosecha vs. no cosecha**")
+        pt = pd.DataFrame(metricas["por_temporada"])
+        pt["grupo"] = pt["grupo"].replace({"cosecha": "Cosecha", "no_cosecha": "No cosecha"})
+        t1, t2 = st.columns(2)
+        t1.altair_chart(_barras(pt, "grupo", "MAPE_%", "MAPE (%)", altura=220), width="stretch")
+        t2.altair_chart(_barras(pt, "grupo", "MAE", "MAE (USD)", altura=220), width="stretch")
+
+    # --------------------------------------------------------------------------- #
+    # Series real vs. predicho, por producto
+    # --------------------------------------------------------------------------- #
+    st.subheader("Precio real vs. predicho (test histórico)")
+    pred = pd.DataFrame(api_get("/api/prediccion", {"modelo": modelo_sel, "productos": slugs_sel}))
+    if pred.empty:
+        st.warning("Sin datos de predicción para esa combinación de producto/modelo.")
+    else:
+        pred["Fecha"] = pd.to_datetime(pred["Fecha"])
+        for producto in productos_sel:
+            sub = pred[pred["Producto"] == producto].set_index("Fecha")[["precio_real", "precio_predicho"]]
+            if sub.empty:
+                continue
+            st.markdown(f"**{producto}**")
+            st.line_chart(sub)
+
+    # --------------------------------------------------------------------------- #
+    # Importancia de variables (por permutación, comparable entre modelos)
+    # --------------------------------------------------------------------------- #
+    st.subheader("Importancia de variables")
+    importancia = api_get_opcional("/api/importancia", {"modelo": modelo_sel, "top": 15})
+    if isinstance(importancia, list) and importancia:
+        df_imp = pd.DataFrame(importancia)
+        st.caption("Cuánto empeora el error (MAE, USD) al barajar cada variable en el tramo de prueba. "
+                   "Domina el precio pasado; combustible, lluvia e IPC aportan casi nada.")
+        g_imp = alt.Chart(df_imp).mark_bar().encode(
+            y=alt.Y("feature:N", sort="-x", title=None), x=alt.X("importancia:Q", title="Aumento del MAE (USD)"),
+            tooltip=["feature", alt.Tooltip("importancia", format=".3f")]).properties(height=380)
+        st.altair_chart(g_imp, width="stretch")
+    else:
+        st.info("La LSTM usa solo una ventana de precios pasados (sin variables externas), por lo que no tiene "
+                "importancia de variables que mostrar.")
+
+    # --------------------------------------------------------------------------- #
+    # Evaluación ética y de sesgos
+    # --------------------------------------------------------------------------- #
+    st.subheader("Evaluación ética y de sesgos")
+    equidad = api_get("/api/equidad", {"modelo": modelo_sel})
+    mp = [r["MAPE_%"] for r in equidad["por_producto"]]
+    e1, e2 = st.columns(2)
+    if mp and min(mp) > 0:
+        e1.metric("Brecha entre productos (peor/mejor MAPE)", f"{max(mp) / min(mp):.1f}x",
+                  help="Refleja que el tomate es mucho más volátil que el arroz; no es un sesgo del modelo.")
+    if equidad.get("por_temporada"):
+        mt = [r["MAPE_%"] for r in equidad["por_temporada"]]
+        if min(mt) > 0:
+            e2.metric("Brecha cosecha vs. no cosecha", f"{max(mt) / min(mt):.1f}x")
+    st.caption("Comunicar el error de cada producto y no solo el promedio. Los productos con MAPE alto "
+               "aparecen en rojo en las gráficas de arriba.")
+    if equidad["reporte"]:
+        st.markdown("**Limitaciones y consideraciones éticas**")
+        st.text(equidad["reporte"].split("Limitaciones y consideraciones éticas:")[-1].strip())
+
+
+tab_back, tab_pron = st.tabs(["Backtest y comparación de modelos", "Pronóstico (1–4 semanas)"])
+with tab_back:
+    vista_backtest()
+with tab_pron:
+    vista_pronostico()

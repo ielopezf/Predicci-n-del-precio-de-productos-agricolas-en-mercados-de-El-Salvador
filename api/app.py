@@ -90,7 +90,7 @@ def importancia():
     top = int(request.args.get("top", 15))
     tabla = reg.importancia_modelo(modelo, top=top)
     if tabla is None:
-        return jsonify({"error": f"'{modelo}' no expone importancia de variables (ni feature_importances_ ni coef_)."}), 400
+        return jsonify({"error": f"'{modelo}' no tiene importancia de variables disponible (la LSTM usa solo precios pasados)."}), 400
     return jsonify(tabla)
 
 
